@@ -1,8 +1,7 @@
 # Aker AI — Round 2 Case Study
 
 ## Status
-Investigation done, now building. Data structure and edge cases are understood (see below).
-Schema is locked (see Schema section). Building SQLite + loader now, then FastAPI backend,
+Schema written and validated (db/schema.sql), building the loader next, then FastAPI backend,
 then dashboard + LLM chatbot on top.
 
 ## Build plan (decided)
@@ -26,27 +25,56 @@ then dashboard + LLM chatbot on top.
 - **Deployment**: keep it to one deployable service if possible (FastAPI serving API +
   frontend) given the Monday deadline. Render or Railway for hosting.
 
-## Schema (locked)
+## Schema (locked, see db/schema.sql for the actual DDL)
 - `properties` — one row per real property (16 unique, not 25 files). PK is the numeric
-  code prefix (e.g. 134), not the name string.
+  code prefix stripped of its program suffix (e.g. `134`, not `134c`/`134r`/`134land`).
+  `altapm` has no numeric prefix at all, kept as literal property_id `altapm` (it's the
+  empty placeholder property anyway, see data_quality_flags).
 - `property_name_aliases` — handles cases like "55 Riverwalk Place" vs "Fifty-Five
   Riverwalk Place" (same property, code 134, name spelled differently across its own files).
-- `data_snapshots` — one row per source file ingested (property_id, source_type, as_of_date,
-  source_filename). Everything else hangs off this, so loading a second month later is just
-  more snapshot rows, not a redesign.
-- `units` — unit_id, property_id, unit_number, unit_type, sq_ft.
+- `data_snapshots` — one row per source file ingested (property_id, program_type,
+  source_type, as_of_date, source_filename). Everything else hangs off this, so loading a
+  second month later is just more snapshot rows, not a redesign.
+- `program_type` (on data_snapshots and units) — residential / affordable / commercial /
+  land / unknown, derived from the filename suffix (r/a/c/land). The suffix isn't a
+  different property, it's a different revenue program within the same physical property —
+  this is what makes "% of this property's revenue that's commercial vs subsidized vs
+  market-rate" queryable for the concentration-risk feature.
+- `units` — unit_id, property_id, program_type, unit_number, unit_type, sq_ft. Unique on
+  (property_id, program_type, unit_number), not just (property_id, unit_number), since unit
+  numbering can collide across programs within one property (e.g. a residential unit and a
+  commercial suite both numbered "101").
 - `tenancies` — one row per unit-resident-period, tied to a snapshot. Has a real `status`
   enum (current / future_applicant / vacant / model / down) instead of burying that in the
   resident name field the way the source Excel does (VACANT/MODEL/DOWN as literal names).
 - `charges` — one row per charge line item, tied to a tenancy (charge_code, amount).
-- `charge_codes` — lookup table for the 33 known codes (see below), each with a `category`
-  (base_rent / ancillary / utility / commercial / subsidy / fee) so revenue grouping never
-  needs hardcoded code lists in application code.
+- `charge_codes` — lookup table for the 33 known codes, each with a `category` (base_rent /
+  ancillary / utility / commercial / subsidy / fee / concession) so revenue grouping never
+  needs hardcoded code lists in application code. `concession` covers the 7 CON*-prefixed
+  codes (CONRENT, CONPARK, CONGAR, CONPETM, CONSTOR, CONAMEN, CONEMP) — confirmed by
+  checking actual amounts in the source data that every CON* charge is stored as a negative
+  number (credits against the category they offset), not ordinary revenue. This feeds
+  `v_effective_revenue_by_property`, a view giving gross revenue, concessions, and net
+  effective revenue per property (standard real estate "effective rent" framing).
 - `unit_availability_snapshots` — near-direct mirror of the Unit Availability Excel files
   (avg sq ft, avg rent, occupied/vacant/notice counts, model/down/admin, % occ, % leased,
   % trend), tied to property_id + snapshot_id. This table requires no real transform logic,
   unlike tenancies/charges which need the nested section-splitting logic from the Rent Roll.
 - `data_quality_flags` — computed at load time (flag_type, detail, tied to snapshot/property).
+
+## Loader best practices (decided, applies to the ETL script)
+- Idempotent: re-running on the same files shouldn't double rows. Check/replace by
+  source_filename rather than blind-appending.
+- Transactional per source file: one file's insert is all-or-nothing, a mid-file failure
+  can't leave partial rows behind.
+- Validate known invariants live, don't just trust them: re-check charge-line-sum-vs-Total
+  as it loads (already confirmed zero mismatches across all 4,106 records during
+  investigation, but the loader should catch it if that ever breaks on new data).
+- Data quality flags get written during the load itself, not as a separate later pass —
+  altapm/134land/183c being empty, 153c's broken Unit Availability snapshot, etc. all get
+  flagged the moment the loader hits them.
+- Fail loud on structural surprises (unexpected header layout, unknown charge code) rather
+  than silently skipping or guessing.
 
 ## Assignment (from Aker)
 1. Design a relational database schema to store as much data as possible from the Excel files.
@@ -117,6 +145,10 @@ Deadline: Monday, August 10.
 - Prefer clarity over cleverness when parsing the nested Excel layout — forward-fill logic and
   section-splitting need to be easy to audit, since correctness here is the whole point of the
   exercise for this interview.
+- No Claude Code skills for this project yet. Nothing here repeats often enough to be worth
+  packaging while still mid-build. Revisit if "load a new month's data" becomes an actual
+  recurring operation once the loader's proven correct — building a skill before the process
+  is settled just means rewriting it.
 
 ## Working style
 - Casual, direct tone. Plain English over jargon.
