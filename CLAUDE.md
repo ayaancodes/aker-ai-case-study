@@ -113,6 +113,21 @@ Deadline: Monday, August 10.
     into the portfolio — don't assume every property is a standard residential apartment complex.
 
 ## Edge cases found (full investigation, all 25+25 files walked programmatically)
+- **CON* charge codes are 214/216 negative, not 100%** — worth calling out explicitly since
+  it's the kind of thing that could be a deliberate trap in this dataset (assume a clean
+  rule holds everywhere, then get burned when it doesn't). The 7 CON*-prefixed codes
+  (CONRENT, CONPARK, CONGAR, CONPETM, CONSTOR, CONAMEN, CONEMP) are concessions/credits and
+  overwhelmingly stored as negative amounts, confirming that read. But 2 of 216 lines are
+  positive: `153r` unit 2-26 (RENT $2,852 + CONRENT **+$1,083.84** = Total $3,935.84,
+  concession added to the total instead of subtracted) and `143a` unit 1315 (PARKING $75 +
+  CONPARK **+$75**, both positive, same charge type stacked). No clean business explanation
+  from the data alone, most likely a concession reversal or a source-system data entry
+  inconsistency, not evidence the category itself is wrong. Doesn't require a schema change:
+  `v_effective_revenue_by_property` just SUMs amounts regardless of sign, so both outliers
+  net in correctly either way. Caught by actually checking min/max across every CON* row
+  instead of trusting a 5-row sample, worth remembering that lesson generally: verify
+  "always negative"/"always X" claims against the full dataset, not a sample, before they
+  get written down as fact.
 - 3 rent roll files are structurally empty (no unit rows at all): `134land`, `183c`, `altapm`.
   `altapm` looks like a placeholder/test property, not a real one.
 - 7 of 25 rent roll files have no Future Residents/Applicants section — current residents
