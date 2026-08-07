@@ -51,11 +51,15 @@ then dashboard + LLM chatbot on top.
 - `charge_codes` — lookup table for the 33 known codes, each with a `category` (base_rent /
   ancillary / utility / commercial / subsidy / fee / concession) so revenue grouping never
   needs hardcoded code lists in application code. `concession` covers the 7 CON*-prefixed
-  codes (CONRENT, CONPARK, CONGAR, CONPETM, CONSTOR, CONAMEN, CONEMP) — confirmed by
-  checking actual amounts in the source data that every CON* charge is stored as a negative
-  number (credits against the category they offset), not ordinary revenue. This feeds
-  `v_effective_revenue_by_property`, a view giving gross revenue, concessions, and net
-  effective revenue per property (standard real estate "effective rent" framing).
+  codes (CONRENT, CONPARK, CONGAR, CONPETM, CONSTOR, CONAMEN, CONEMP) — checked actual
+  amounts in the source data: 214 of 216 CON* charge lines are negative (credits against the
+  category they offset). 2 exceptions are positive (CONRENT +$1,083.84 in `153r`, CONPARK
+  +$75 in `143a`), likely a concession reversal or data entry inconsistency in the source
+  system, not evidence the category is wrong. Doesn't affect the schema either way —
+  `v_effective_revenue_by_property` just SUMs amounts regardless of sign, so it nets in
+  correctly no matter which way an individual line points. This view gives gross revenue,
+  concessions, and net effective revenue per property (standard real estate "effective rent"
+  framing).
 - `unit_availability_snapshots` — near-direct mirror of the Unit Availability Excel files
   (avg sq ft, avg rent, occupied/vacant/notice counts, model/down/admin, % occ, % leased,
   % trend), tied to property_id + snapshot_id. This table requires no real transform logic,
