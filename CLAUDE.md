@@ -1,9 +1,52 @@
 # Aker AI — Round 2 Case Study
 
 ## Status
-Investigation phase only. No build decisions have been made yet — schema, backend,
-dashboard, and chatbot are all still open. Do not scaffold a database, API, dashboard,
-or chatbot unless explicitly asked to. Right now the job is understanding the data.
+Investigation done, now building. Data structure and edge cases are understood (see below).
+Schema is locked (see Schema section). Building SQLite + loader now, then FastAPI backend,
+then dashboard + LLM chatbot on top.
+
+## Build plan (decided)
+- **DB engine**: SQLite. Single file, zero setup, plenty for this data size (~4-5k rows).
+  Gitignored, same as raw Excel data, since it holds resident/financial data.
+- **Schema**: normalized tables + SQL views for hot-path aggregates (revenue by category,
+  revenue by property, occupancy trend). See Schema section below.
+- **Backend**: FastAPI. Endpoints double as tool definitions for the LLM chatbot (function
+  calling), so dashboard and chatbot pull from the exact same API, no duplicated logic.
+- **Chatbot**: Claude API (Anthropic), tool-calling against the FastAPI endpoints. Not
+  raw text-to-SQL — the model calls defined endpoints, never touches SQL directly.
+- **Dashboard**: portfolio-aware view, reframed with an investment-fund lens since Aker
+  is an investment company with real estate + AI holdings (not just a property manager
+  tool) — NOI-style revenue per property/sq ft, portfolio concentration risk (subsidized/
+  commercial/market-rate revenue mix), lease rollover risk, underperformer flagging.
+- **Data quality as a feature**: known issues (153c's broken Unit Availability snapshot,
+  altapm being an empty placeholder property, Riverwalk Place naming split across files)
+  get stored as real flagged rows at load time, not just tribal knowledge — this becomes
+  a live "anomalies" feature the chatbot can report on, second priority after the
+  portfolio-aware chatbot + dashboard.
+- **Deployment**: keep it to one deployable service if possible (FastAPI serving API +
+  frontend) given the Monday deadline. Render or Railway for hosting.
+
+## Schema (locked)
+- `properties` — one row per real property (16 unique, not 25 files). PK is the numeric
+  code prefix (e.g. 134), not the name string.
+- `property_name_aliases` — handles cases like "55 Riverwalk Place" vs "Fifty-Five
+  Riverwalk Place" (same property, code 134, name spelled differently across its own files).
+- `data_snapshots` — one row per source file ingested (property_id, source_type, as_of_date,
+  source_filename). Everything else hangs off this, so loading a second month later is just
+  more snapshot rows, not a redesign.
+- `units` — unit_id, property_id, unit_number, unit_type, sq_ft.
+- `tenancies` — one row per unit-resident-period, tied to a snapshot. Has a real `status`
+  enum (current / future_applicant / vacant / model / down) instead of burying that in the
+  resident name field the way the source Excel does (VACANT/MODEL/DOWN as literal names).
+- `charges` — one row per charge line item, tied to a tenancy (charge_code, amount).
+- `charge_codes` — lookup table for the 33 known codes (see below), each with a `category`
+  (base_rent / ancillary / utility / commercial / subsidy / fee) so revenue grouping never
+  needs hardcoded code lists in application code.
+- `unit_availability_snapshots` — near-direct mirror of the Unit Availability Excel files
+  (avg sq ft, avg rent, occupied/vacant/notice counts, model/down/admin, % occ, % leased,
+  % trend), tied to property_id + snapshot_id. This table requires no real transform logic,
+  unlike tenancies/charges which need the nested section-splitting logic from the Rent Roll.
+- `data_quality_flags` — computed at load time (flag_type, detail, tied to snapshot/property).
 
 ## Assignment (from Aker)
 1. Design a relational database schema to store as much data as possible from the Excel files.
@@ -29,13 +72,39 @@ Deadline: Monday, August 10.
 - Vacant units show resident name literally as "VACANT".
 - Bottom of file: property-level occupancy summary + a "Summary of Charges by Charge Code" table.
   These are aggregates, not new source rows — don't double-count them as unit-level data.
-- Confirmed real charge codes across the portfolio (32 total): RENT, RENTAFF, RENTHAP, RENTRETL,
-  CONRENT, PARKING, CONPARK, GARAGE, CONGAR, PETFEE, PETFEEM, CONPETM, STORAGE, CONSTOR, AMENITY,
-  CONAMEN, TRASH, WATER, UTILCOM, BIKE, W/D, SDFEE, SALESTX, RETXEST, CAMEST, CAMINSR, SEC8CRD,
-  SUBSIDY, MTM, HOMEPCKG, CONEMP.
+- Confirmed real charge codes across the portfolio (33 total): RENT, RENTAFF, RENTHAP, RENTRETL,
+  RNTPROF, CONRENT, PARKING, CONPARK, GARAGE, CONGAR, PETFEE, PETFEEM, CONPETM, STORAGE, CONSTOR,
+  AMENITY, CONAMEN, TRASH, WATER, UTILCOM, BIKE, W/D, SDFEE, SALESTX, RETXEST, CAMEST, CAMINSR,
+  SEC8CRD, SUBSIDY, MTM, HOMEPCKG, CONEMP.
   - Presence of RENTHAP/SEC8CRD/SUBSIDY indicates some affordable/subsidized housing units.
-  - Presence of CAMEST/CAMINSR/RENTRETL indicates some commercial-flavored leases mixed into
-    the portfolio — don't assume every property is a standard residential apartment complex.
+  - Presence of CAMEST/CAMINSR/RENTRETL/RNTPROF indicates some commercial-flavored leases mixed
+    into the portfolio — don't assume every property is a standard residential apartment complex.
+
+## Edge cases found (full investigation, all 25+25 files walked programmatically)
+- 3 rent roll files are structurally empty (no unit rows at all): `134land`, `183c`, `altapm`.
+  `altapm` looks like a placeholder/test property, not a real one.
+- 7 of 25 rent roll files have no Future Residents/Applicants section — current residents
+  only. Legitimate variant, not corruption.
+- Missing Move In/Lease Expiration tracks VACANT units almost exactly (one stray case in
+  `126r` worth a second look if it ever matters). Missing Move Out is expected for anyone who
+  hasn't given notice yet, and near-100% for Future Residents (haven't moved in yet).
+- 427 rows have negative balances (down to -$11,141.05, credits/large arrears), 67 rows have
+  |balance| > $5,000. Real business data, not errors — balance must stay signed decimal.
+- No genuine duplicate residents. "VACANT" (3x in `134c`) and "DOWN" (8x in `184r`) repeat as
+  resident codes but they're placeholder statuses, not real people reused across units.
+- Charge-line-to-Total math checked across all 4,106 unit records: zero mismatches.
+- 25 rent roll files map to only 16 unique properties (a/c/r/land suffixes split one property
+  across multiple files). "55 Riverwalk Place" (134c, 134land) vs "Fifty-Five Riverwalk Place"
+  (134r) is the same property (code 134) with an inconsistent name across its own files —
+  match properties by code prefix, never by name string.
+- Unit Availability structure is rock solid across all 25 files (7 rows x 18 cols, no
+  deviations). Cross-checked its unit counts against independently counting Rent Roll rows:
+  matches in 24 of 25. The one break: `153c` (Abbot Mill commercial) Unit Availability is
+  all-zeros while its Rent Roll has 7 real unit rows — stale/broken data for that file.
+- Model and Down units are NOT Unit-Availability-exclusive — they match `ResidentCode =
+  "MODEL"`/`"DOWN"` rows in the Rent Roll exactly, same placeholder-status pattern as VACANT.
+  Admin is 0 in every single Unit Availability file portfolio-wide, so it's untested whether
+  Rent Roll has an equivalent signal for it.
 
 ### Unit Availability
 - Single sheet per file, only ~7 rows — a property-level summary snapshot, not per-unit data.
