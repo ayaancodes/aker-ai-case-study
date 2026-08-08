@@ -72,6 +72,27 @@ def load_rent_roll_file(conn, filepath):
             f"{filename} contains zero unit rows",
         )
 
+    # A unit with market_rent > 0 and Total = 0 doesn't trip the mismatch check above
+    # (0 charges legitimately sums to a stated Total of 0), but it's still a real data
+    # problem: a resident paying real rent with no recorded charge lines at all. Found
+    # by comparing revenue across properties on the dashboard -- Kinwood Apartments
+    # showed ~$4k total revenue against $823k in summed market rent. Checking the full
+    # portfolio showed this isn't a one-off: 5 of 15 properties have 100% or near-100%
+    # of occupied tenancies missing charges entirely (see CLAUDE.md edge cases).
+    occupied_with_rent = [
+        u for u in parsed["units"]
+        if u["section"] == "current" and u["status"] == "occupied" and (u["market_rent"] or 0) > 0
+    ]
+    missing_charges = [u for u in occupied_with_rent if not u["charges"]]
+    if occupied_with_rent and len(missing_charges) / len(occupied_with_rent) > 0.5:
+        pct = 100 * len(missing_charges) / len(occupied_with_rent)
+        db.add_flag(
+            conn, property_id, snapshot_id, "missing_charges",
+            f"{len(missing_charges)} of {len(occupied_with_rent)} occupied tenancies "
+            f"({pct:.0f}%) have zero recorded charges despite nonzero market rent -- "
+            f"revenue for this property/program is understated",
+        )
+
     conn.commit()
     return {
         "filename": filename,

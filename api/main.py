@@ -6,18 +6,51 @@ clean, predictable shape here matters more than for a typical CRUD API.
 Run: uvicorn api.main:app --reload
 """
 
+from pathlib import Path
 from typing import List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi.staticfiles import StaticFiles
 
 from api.db import get_connection
 
 app = FastAPI(title="Aker Portfolio API")
 
+WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/stats")
+def portfolio_stats(conn=Depends(get_connection)):
+    """Portfolio-wide counts used for the dashboard's proof-of-rigor stat tiles --
+    real numbers from the database, not display-layer guesses."""
+    properties = conn.execute("SELECT COUNT(*) FROM properties").fetchone()[0]
+    tenancies = conn.execute("SELECT COUNT(*) FROM tenancies").fetchone()[0]
+    charges = conn.execute("SELECT COUNT(*) FROM charges").fetchone()[0]
+    flags = conn.execute("SELECT COUNT(*) FROM data_quality_flags").fetchone()[0]
+    mismatches = conn.execute(
+        "SELECT COUNT(*) FROM data_quality_flags WHERE flag_type = 'charge_total_mismatch'"
+    ).fetchone()[0]
+    holdover_leases = conn.execute(
+        """SELECT COUNT(*) FROM tenancies
+           WHERE section = 'current' AND status = 'occupied'
+             AND lease_expiration < (
+                 SELECT MAX(as_of_date) FROM data_snapshots WHERE source_type = 'rent_roll'
+             )"""
+    ).fetchone()[0]
+
+    return {
+        "properties": properties,
+        "tenancies": tenancies,
+        "charges": charges,
+        "charge_total_mismatches": mismatches,
+        "data_quality_flags": flags,
+        "holdover_leases": holdover_leases,
+    }
 
 
 @app.get("/properties")
@@ -195,3 +228,8 @@ def anomalies(property_id: Optional[str] = None, conn=Depends(get_connection)):
 
     rows = conn.execute(query, params).fetchall()
     return [dict(r) for r in rows]
+
+
+# Mounted last, after every API route above -- Starlette matches declared routes
+# before falling through to a mount, so this can't shadow /properties, /revenue/etc.
+app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="dashboard")

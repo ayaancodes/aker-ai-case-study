@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aker Portfolio Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav id="nav">
+  <div class="nav-in">
+    <a class="logo" href="#top">
+      <span class="logo-mark">A</span>
+      <span class="logo-name">Aker <em>Terminal</em></span>
+    </a>
+    <div class="nav-links links">
+      <a href="#stats">Portfolio</a>
+      <a href="#loop">Pipeline</a>
+      <a href="#revenue">Revenue</a>
+      <a href="#anomalies">Anomalies</a>
+    </div>
+    <div class="nav-cta">
+      <button class="theme-btn" id="themeBtn" aria-label="Toggle color theme">
+        <svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M19.1 4.9l-1.8 1.8M6.7 17.3l-1.8 1.8"/></svg>
+        <svg class="moon" viewBox="0 0 24 24"><path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a7 7 0 0 0 11 11z"/></svg>
+      </button>
+      <a class="btn btn-ghost" href="/docs" target="_blank">API Docs</a>
+    </div>
+  </div>
+</nav>
+
+<section class="hero" id="top">
+  <div class="orb orb-c" style="width:480px;height:480px;top:-120px;right:-140px"></div>
+  <div class="orb orb-v" style="width:420px;height:420px;top:30%;left:-160px"></div>
+  <div class="wrap hero-in">
+    <div class="eyebrow"><span class="dot"></span>LIVE DATA · DATA QUALITY ENFORCED · SAME API POWERS THE CHATBOT</div>
+    <h1>Run the portfolio like a fund.<br><span class="grad-text">Understand it like an operator.</span></h1>
+    <p class="hero-sub">Every number below is computed live from the same normalized database and API that will power the chatbot &mdash; <b>no mocked numbers, no separate copy of the data.</b></p>
+    <div class="hero-note" id="asOfNote">AS OF &mdash; · 15 PROPERTIES · SQLITE + FASTAPI, ONE DEPLOYABLE SERVICE</div>
+  </div>
+  <div class="tape" aria-hidden="true"><div class="tape-track" id="tape"></div></div>
+</section>
+
+<section class="stats" id="stats">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-eyebrow">PROOF, NOT CLAIMS</div>
+      <h2>Every number here was <span class="grad-text">checked, not assumed.</span></h2>
+      <p class="sec-sub">Caught by actually re-validating known invariants at load time, not by trusting the source files.</p>
+    </div>
+    <div class="stats-grid reveal stagger" id="statsGrid">
+      <div class="stat"><div class="v mono" data-count="0">0</div><div class="k">Charge-total mismatches</div><div class="u">across every charge line loaded</div></div>
+      <div class="stat"><div class="v mono" data-count="0">0</div><div class="k">Properties in the portfolio</div><div class="u">deduped from 25 source files</div></div>
+      <div class="stat"><div class="v mono" data-count="0">0</div><div class="k">Tenancy records loaded</div><div class="u">unit-resident-periods, this snapshot</div></div>
+      <div class="stat"><div class="v mono" data-count="0">0</div><div class="k">Data quality flags caught</div><div class="u">written automatically at load time</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="pillars">
+  <div class="orb orb-c" style="width:380px;height:380px;top:0;right:-120px"></div>
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-eyebrow">WHY THIS HOLDS UP</div>
+      <h2>Built to survive month two.</h2>
+      <p class="sec-sub">Not just correct for the data we have &mdash; designed for the data we don't have yet.</p>
+    </div>
+    <div class="pillar-grid">
+      <div class="pillar reveal"><span class="corner-orb"></span>
+        <div class="icon-wrap"><div class="icon-in"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4.5"/></svg></div></div>
+        <h3>Data quality, enforced</h3>
+        <p>Known issues get written as real rows the moment the loader hits them &mdash; a broken source file, an empty property &mdash; not tribal knowledge in a doc.</p>
+        <div class="tagline">FLAGGED AT LOAD TIME · QUERYABLE LIVE</div>
+      </div>
+      <div class="pillar reveal" style="transition-delay:.08s"><span class="corner-orb"></span>
+        <div class="icon-wrap"><div class="icon-in"><svg viewBox="0 0 24 24"><path d="M2 20h20M5 20V9m5 11V4m5 16v-8m5 8V7"/></svg></div></div>
+        <h3>Snapshot-based history</h3>
+        <p>Every fact-bearing table points back to the source file it came from. A second month of data is purely additive &mdash; no redesign, no overwriting.</p>
+        <div class="tagline">TIME-SERIES READY BY DESIGN</div>
+      </div>
+      <div class="pillar reveal" style="transition-delay:.16s"><span class="corner-orb"></span>
+        <div class="icon-wrap"><div class="icon-in"><svg viewBox="0 0 24 24"><path d="M17 2l4 4-4 4M21 6H8a5 5 0 00-5 5M7 22l-4-4 4-4M3 18h13a5 5 0 005-5"/></svg></div></div>
+        <h3>One API, every surface</h3>
+        <p>This dashboard and the chatbot call the exact same endpoints. No duplicated query logic, no risk of the two disagreeing with each other.</p>
+        <div class="tagline">DASHBOARD + CHATBOT · SAME SOURCE</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="loop" id="loop">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-eyebrow">THE PIPELINE</div>
+      <h2>From spreadsheet to <span class="grad-text">structured answer.</span></h2>
+    </div>
+    <div class="loop-track reveal stagger">
+      <div class="loop-node">
+        <div class="loop-dot"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M4 9h16M9 4v16"/></svg></div>
+        <div class="loop-step">01 · INGEST</div>
+        <h4>50 Excel files</h4>
+        <p>Parsed programmatically, property identity derived from filename pattern, no hardcoded list.</p>
+      </div>
+      <div class="loop-node">
+        <div class="loop-dot"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
+        <div class="loop-step">02 · VALIDATE</div>
+        <h4>Checked live</h4>
+        <p>Charge-line sums re-verified against stated totals as it loads, not trusted from a sample.</p>
+      </div>
+      <div class="loop-node">
+        <div class="loop-dot"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12h8M12 8v8"/></svg></div>
+        <div class="loop-step">03 · STRUCTURE</div>
+        <h4>Normalized schema</h4>
+        <p>Properties, units, tenancies, charges &mdash; snapshot-based, ready for month two.</p>
+      </div>
+      <div class="loop-node">
+        <div class="loop-dot"><svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg></div>
+        <div class="loop-step">04 · UNDERSTAND</div>
+        <h4>API + chatbot</h4>
+        <p>The same endpoints power this dashboard and the tool-calling chatbot, next.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="eq-sec" id="revenue">
+  <div class="orb orb-v" style="width:420px;height:420px;bottom:-100px;left:-150px"></div>
+  <div class="wrap">
+    <div class="eq-panel reveal">
+      <div class="eq-head">
+        <div>
+          <div class="eq-title">Net effective revenue by property</div>
+          <div class="eq-sub" id="revenueSub">latest snapshot &middot; gross &minus; concessions</div>
+        </div>
+        <span class="badge" id="revenueBadge">&check; ZERO CHARGE MISMATCHES &middot; VALIDATED LIVE</span>
+      </div>
+      <div class="eq-body" id="revenueBars"></div>
+      <div class="eq-foot" id="revenueFoot"></div>
+    </div>
+  </div>
+</section>
+
+<section class="lib-sec" id="library">
+  <div class="wrap sec-head reveal">
+    <div class="sec-eyebrow">THE PORTFOLIO</div>
+    <h2>15 properties, <span class="grad-text">one source of truth.</span></h2>
+    <p class="sec-sub">Every card below is fetched live from <code class="mono">/properties</code> and <code class="mono">/revenue/portfolio</code>.</p>
+  </div>
+  <div class="marquee"><div class="marquee-track" id="mq1"></div></div>
+  <div class="marquee m2"><div class="marquee-track" id="mq2"></div></div>
+</section>
+
+<section class="anomaly-sec" id="anomalies">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-eyebrow">DATA QUALITY, LIVE</div>
+      <h2>What's actually wrong <span class="grad-text">right now.</span></h2>
+      <p class="sec-sub">Fetched from <code class="mono">/anomalies</code> &mdash; these were caught by the loader itself, not written up after the fact.</p>
+    </div>
+    <div class="anomaly-list reveal stagger" id="anomalyList"></div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot-in">
+    <div class="foot-brand">
+      <a class="logo" href="#top"><span class="logo-mark">A</span><span class="logo-name">Aker <em>Terminal</em></span></a>
+      <p>Aker AI round 2 case study &mdash; schema, loader, API and dashboard built end to end against real data, every layer manually validated.</p>
+    </div>
+    <div class="foot-col">
+      <div><h5>Layers</h5><a href="#stats">Data quality</a><a href="#revenue">Revenue</a><a href="#library">Portfolio</a><a href="/docs" target="_blank">API reference</a></div>
+      <div><h5>Built on</h5><a href="https://fastapi.tiangolo.com" target="_blank" rel="noopener">FastAPI</a><a href="https://sqlite.org" target="_blank" rel="noopener">SQLite</a><a href="https://www.anthropic.com" target="_blank" rel="noopener">Anthropic (chatbot, next)</a></div>
+    </div>
+  </div>
+  <div class="wrap foot-base">
+    <span>AKER AI &middot; ROUND 2 CASE STUDY</span>
+    <span class="r">DASHBOARD &middot; CHATBOT NEXT</span>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

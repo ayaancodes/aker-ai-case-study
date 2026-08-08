@@ -67,6 +67,25 @@ field, cross-referenced Unit Availability against independently counting Rent Ro
   file) — the parser uses row 5, not row 6.
 
 ### Result: edge cases found (the ones that actually shaped the schema/loader)
+- **5 of 15 properties (`175`, `176`, `183`, `184`, `185`) have 100% or near-100% of
+  occupied tenancies missing charge lines entirely**, despite carrying real market rent,
+  real residents, real lease dates. Kinwood Apartments (`175`): 365 of 367 occupied
+  tenancies have zero charges, market rent sums to $823k but recorded revenue was only
+  $4,144. This is the single biggest gap the original investigation missed — the
+  "charge-line-to-Total math checked, zero mismatches" claim below is technically true
+  and also misleading: a unit with 0 charges and a stated Total of 0 legitimately
+  "matches," so that check has no way to catch a unit that's missing all its charges,
+  only a unit whose charges don't sum to what the file claims they sum to. Two
+  structurally different failure modes, and the investigation only ever tested for one
+  of them. Found while building the dashboard's revenue-by-property view — Kinwood's
+  bar was visibly, absurdly short next to every other property, not from re-running the
+  investigation. Once found, checked across the full portfolio rather than assuming it
+  was a one-off (same discipline as the CON* and property-count corrections) and it
+  turned out to be systemic across 5 properties, not isolated to Kinwood. Now caught
+  automatically at load time as a `missing_charges` flag (>50% of occupied tenancies
+  with market_rent > 0 but zero charges) — see section 3. Revenue for these 5 properties
+  in the current dataset is materially understated; any ranking or "top/bottom
+  performer" view needs to account for this, not just display the raw numbers.
 - **3 rent roll files are structurally empty** (no unit rows at all): `134land`, `183c`,
   `altapm`. `altapm` looks like a placeholder/test property, not a real one.
 - **7 of 25 rent roll files have no Future Residents/Applicants section** — current
@@ -208,18 +227,23 @@ itself.
   abort-the-whole-batch, since that's what actually scales to more files.)
 - Charge-line-sum-vs-stated-Total is re-validated live as it loads, not just trusted
   from the investigation.
-- Data quality flags get written during the load itself: empty rent rolls, and a
+- Data quality flags get written during the load itself: empty rent rolls, a
   cross-check between each property's latest Rent Roll and Unit Availability unit
   counts (this is what catches `153c` automatically, the same check done by hand
-  during investigation, now automated).
+  during investigation, now automated), and a check for occupied tenancies with real
+  market rent but zero recorded charges (`missing_charges`, >50% of a property's
+  occupied tenancies affected) — this one wasn't in the original investigation, added
+  after the dashboard's revenue view surfaced it, see section 1 edge cases.
 
 ### Result: verified against the real data
 - 25/25 rent roll files loaded, 25/25 unit availability files loaded.
 - **15 properties** (this is the authoritative, programmatic dedup count — corrects the
   "16" hand-count from initial investigation).
 - 4,106 tenancies, 9,177 charges.
-- 4 data quality flags, exactly matching what investigation predicted: 3 empty
-  properties (`134land`, `183c`, `altapm`) + 1 unit-availability mismatch (`153c`).
+- **10 data quality flags total** (grew from 4 to 10 after the missing_charges finding
+  below — see that section for how the other 6 got caught): 3 empty properties
+  (`134land`, `183c`, `altapm`) + 1 unit-availability mismatch (`153c`) + 6
+  missing_charges flags (`175`, `176`, `183`x2, `184`, `185`).
 - Zero charge-total mismatches.
 - Idempotent re-run gives identical counts.
 
