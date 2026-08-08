@@ -76,6 +76,18 @@ def _to_number(value, default=0):
     return float(value)
 
 
+def _mmddyyyy_to_iso(value):
+    """Header 'As Of' dates are formatted MM/DD/YYYY in the source text, while every
+    other date field in this parser (move_in, lease_expiration, move_out) comes from
+    real Excel datetime cells and gets normalized to ISO by _to_date. Without this,
+    as_of_date would be the only date column stored in a different format, which
+    silently breaks any SQL date comparison/arithmetic against it."""
+    if value is None:
+        return None
+    month, day, year = value.split("/")
+    return f"{year}-{int(month):02d}-{int(day):02d}"
+
+
 def _parse_header(df, filename):
     row1 = df.iat[1, 0]
     match = _NAME_CODE_RE.match(str(row1)) if not _is_blank(row1) else None
@@ -87,7 +99,7 @@ def _parse_header(df, filename):
 
     row2 = str(df.iat[2, 0]) if not _is_blank(df.iat[2, 0]) else ""
     as_of_match = _AS_OF_RE.search(row2)
-    as_of_date = as_of_match.group(1) if as_of_match else None
+    as_of_date = _mmddyyyy_to_iso(as_of_match.group(1)) if as_of_match else None
 
     row3 = str(df.iat[3, 0]) if not _is_blank(df.iat[3, 0]) else ""
     month_year_match = _MONTH_YEAR_RE.search(row3)

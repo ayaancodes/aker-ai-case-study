@@ -47,6 +47,15 @@ def _is_blank(value):
     return pd.isna(value)
 
 
+def _mmddyyyy_to_iso(value):
+    """Same fix as rent_roll_parser._mmddyyyy_to_iso -- keep as_of_date in ISO format
+    so it's comparable against other date fields with plain SQL date functions."""
+    if value is None:
+        return None
+    month, day, year = value.split("/")
+    return f"{year}-{int(month):02d}-{int(day):02d}"
+
+
 def parse_unit_availability(filepath, filename=None):
     filename = filename or filepath
     df = pd.read_excel(filepath, header=None)
@@ -66,7 +75,7 @@ def parse_unit_availability(filepath, filename=None):
 
     row2 = str(df.iat[2, 0]) if not _is_blank(df.iat[2, 0]) else ""
     as_of_match = _AS_OF_RE.search(row2)
-    as_of_date = as_of_match.group(1) if as_of_match else None
+    as_of_date = _mmddyyyy_to_iso(as_of_match.group(1)) if as_of_match else None
 
     data = df.iloc[DATA_ROW]
 

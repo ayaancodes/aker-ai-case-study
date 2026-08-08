@@ -1,10 +1,35 @@
 # Aker AI — Round 2 Case Study
 
 ## Status
-Schema built, loader built and validated (scripts/load_data.py + scripts/etl/). Full
-25+25 file load runs clean: 4,106 tenancies, 9,177 charges, 15 properties, 4 data quality
-flags (3 empty rent rolls, 1 unit-availability mismatch), zero charge-total mismatches,
-idempotent on re-run. Building FastAPI backend next, then dashboard + LLM chatbot.
+Schema, loader, and first-loop FastAPI backend (api/main.py) all built and validated end
+to end (every endpoint hit manually against the real loaded DB). Building dashboard +
+LLM chatbot next.
+
+## API (api/main.py, first loop)
+- `/properties`, `/properties/{id}` — list + detail (name, aliases, program types,
+  latest as-of dates per source type).
+- `/revenue/portfolio`, `/revenue/{property_id}` — gross/concessions/net effective
+  revenue, portfolio-wide and per-property, plus category breakdown. Backed by the
+  `v_effective_revenue_by_property` / `v_revenue_by_property_category` views.
+- `/leases/expiring?days=N&property_id=` — leases expiring within N days of the data's
+  latest as-of date. Bounded on both ends (not just an upper bound), see edge cases.
+- `/delinquent?min_balance=&property_id=` — positive-balance tenancies.
+- `/anomalies?property_id=` — data_quality_flags rows.
+- Read-only SQLite connection per request (api/db.py), reuses the same db/aker.db the
+  loader writes to.
+- Fixed two real bugs found while manually testing endpoints against real data (not
+  caught by the loader's own validation, since those check counts/sums, not date
+  formats/query logic):
+  - `as_of_date` was stored as raw `MM/DD/YYYY` text from the source file header, while
+    every other date field is ISO (`YYYY-MM-DD`) from real Excel datetime cells. Broke
+    SQL date comparisons silently (SQLite's `date()` returns NULL on non-ISO input, so
+    `/leases/expiring` returned zero results instead of erroring). Fixed at the parser
+    level (`_mmddyyyy_to_iso` in both etl parsers) so as_of_date is ISO everywhere,
+    not patched around in the API query.
+  - `/leases/expiring` only bounded the upper end of the date window
+    (`lease_expiration <= as_of + N days`), which silently swept in the 331 tenancies
+    with already-expired lease dates (see edge cases) as if they were expiring soon.
+    Fixed with a `BETWEEN` on both ends.
 
 ## Loader architecture (scripts/etl/)
 - `filenames.py` — derives property_id/program_type from filename pattern alone (regex,
@@ -162,6 +187,15 @@ Deadline: Monday, August 10.
 - Missing Move In/Lease Expiration tracks VACANT units almost exactly (one stray case in
   `126r` worth a second look if it ever matters). Missing Move Out is expected for anyone who
   hasn't given notice yet, and near-100% for Future Residents (haven't moved in yet).
+- 331 of 4,106 tenancies have a `lease_expiration` date already in the past relative to the
+  data's As Of date (some by over a decade, e.g. 2015). Likely month-to-month holdovers —
+  original lease term lapsed, resident stayed on, the field never got updated once they went
+  month-to-month. Found while building the `/leases/expiring` endpoint: an early version of
+  that query only bounded the upper end of the date window, so it silently returned these
+  decade-old expired leases as if they were "expiring soon." Fixed by bounding both ends
+  (`BETWEEN as_of_date AND as_of_date + N days`). Worth surfacing "expired, never renewed"
+  as its own risk signal in the dashboard, separate from "expiring soon" — it's a real
+  lease-uncertainty story for an investment-fund audience, not just a data quirk.
 - 427 rows have negative balances (down to -$11,141.05, credits/large arrears), 67 rows have
   |balance| > $5,000. Real business data, not errors — balance must stay signed decimal.
   Top positive balances are concentrated in `139c` (The Mill Greenwich, commercial): 3 units
