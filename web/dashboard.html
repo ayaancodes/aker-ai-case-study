@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard &mdash; Aker Portfolio Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="cursor-glow" id="cursorGlow"></div>
+
+<nav id="nav">
+  <div class="nav-in">
+    <a class="logo" href="index.html">
+      <span class="logo-mark">A</span>
+      <span class="logo-name">Aker <em>Terminal</em></span>
+    </a>
+    <div class="nav-links links">
+      <a href="index.html">Home</a>
+      <a href="how-it-works.html">How it's built</a>
+    </div>
+    <div class="nav-cta">
+      <span class="hero-note"><span class="live-dot"></span><span id="asOfNote">AS OF &mdash;</span></span>
+    </div>
+  </div>
+</nav>
+
+<div class="dash-layout">
+  <aside class="dash-sidebar">
+    <div class="dash-sidebar-head">PROPERTIES</div>
+    <div class="dash-search"><input type="text" id="dashSearch" placeholder="Search&hellip;" autocomplete="off"></div>
+    <div class="dash-plist" id="dashPropertyList"></div>
+  </aside>
+
+  <main class="dash-main">
+    <div class="dash-kpi-strip" id="dashKpiStrip"></div>
+
+    <!-- ───────── PORTFOLIO VIEW (default) ───────── -->
+    <div id="dashPortfolioView">
+      <div class="dash-section dash-grid-2">
+        <div class="eq-panel">
+          <div class="eq-head">
+            <div><div class="eq-title">Net effective revenue by property</div></div>
+          </div>
+          <div class="eq-body"><canvas id="revenueChart"></canvas><div class="eq-tip" id="revenueTip"></div></div>
+        </div>
+        <div class="eq-panel">
+          <div class="eq-head">
+            <div><div class="eq-title">Occupancy by property</div></div>
+          </div>
+          <div class="eq-body"><canvas id="occupancyChart"></canvas><div class="eq-tip" id="occupancyTip"></div></div>
+        </div>
+      </div>
+
+      <div class="dash-section dash-grid-2">
+        <div class="eq-panel">
+          <div class="eq-head">
+            <div><div class="eq-title">Revenue mix</div><div class="eq-sub">by charge category</div></div>
+          </div>
+          <div class="eq-body eq-body-split">
+            <canvas id="donutChart"></canvas>
+            <div class="donut-legend" id="donutLegend"></div>
+          </div>
+        </div>
+        <div class="eq-panel">
+          <div class="eq-head">
+            <div><div class="eq-title">Concentration risk</div><div class="eq-sub">gross revenue by program type</div></div>
+          </div>
+          <div class="eq-body eq-body-split">
+            <canvas id="concChart"></canvas>
+            <div class="donut-legend" id="concLegend"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dash-section risk-grid">
+        <div class="eq-panel">
+          <div class="eq-head"><div><div class="eq-title">Delinquent balances</div></div></div>
+          <div class="risk-list" id="delinquentList"></div>
+        </div>
+        <div class="eq-panel">
+          <div class="eq-head"><div><div class="eq-title">Lease rollover</div><div class="eq-sub">expiring within 60 days</div></div></div>
+          <div class="risk-list" id="leaseList"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───────── PROPERTY VIEW (replaces portfolio view entirely on selection) ───────── -->
+    <div id="dashPropertyView" style="display:none">
+      <button class="dash-back" id="dashBack">&larr; ALL PROPERTIES</button>
+      <div class="dash-prop-head">
+        <h2 id="pName"></h2>
+        <span id="pId"></span>
+      </div>
+
+      <div class="dash-section">
+        <div class="eq-panel">
+          <div class="eq-head"><div><div class="eq-title">Revenue</div></div></div>
+          <div class="eq-body">
+            <div class="waterfall">
+              <div class="wf-col">
+                <div class="wf-val mono" id="wfGrossVal"></div>
+                <div class="wf-bar gross" id="wfGross" style="height:0"></div>
+                <div class="wf-label">Gross</div>
+              </div>
+              <div class="wf-col">
+                <div class="wf-val mono" id="wfConcVal"></div>
+                <div class="wf-bar concession" id="wfConc" style="height:0"></div>
+                <div class="wf-label">Concessions</div>
+              </div>
+              <div class="wf-col">
+                <div class="wf-val mono" id="wfNetVal"></div>
+                <div class="wf-bar net" id="wfNet" style="height:0"></div>
+                <div class="wf-label">Net effective</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dash-section risk-grid">
+        <div class="eq-panel">
+          <div class="eq-head"><div><div class="eq-title">Delinquent balances</div></div></div>
+          <div class="risk-list" id="pDelinquentList"></div>
+        </div>
+        <div class="eq-panel">
+          <div class="eq-head"><div><div class="eq-title">Lease rollover</div></div></div>
+          <div class="risk-list" id="pLeaseList"></div>
+        </div>
+      </div>
+
+      <div class="dash-section">
+        <div class="eq-panel">
+          <div class="eq-head">
+            <div><div class="eq-title">Units</div><div class="eq-sub" id="unitsCount"></div></div>
+          </div>
+          <div class="units-table-wrap">
+            <table class="units-table">
+              <thead>
+                <tr><th>Unit</th><th>Type</th><th>Sq Ft</th><th>Status</th><th>Resident</th><th>Market Rent</th><th>Balance</th><th>Lease Exp.</th></tr>
+              </thead>
+              <tbody id="unitsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="shared.js"></script>
+<script src="dashboard.js"></script>
+</body>
+</html>

@@ -143,6 +143,32 @@ def portfolio_revenue(conn=Depends(get_connection)):
     }
 
 
+@app.get("/revenue/concentration")
+def revenue_concentration(conn=Depends(get_connection)):
+    """Gross revenue by program_type (residential/affordable/commercial/land), portfolio
+    wide -- the concentration-risk view: what share of the portfolio's income depends on
+    subsidized vs market-rate vs commercial tenants. Excludes concessions (a credit
+    against revenue, not a revenue source) so the mix reflects where gross income
+    actually comes from. Declared before /revenue/{property_id} -- FastAPI matches
+    routes in registration order, and a literal path segment must come before a
+    variable one that could also match it, or this always 404s as "unknown property
+    'concentration'"."""
+    rows = conn.execute(
+        """SELECT u.program_type, SUM(c.amount) AS amount
+           FROM charges c
+           JOIN charge_codes cc ON cc.code = c.charge_code
+           JOIN tenancies t ON t.tenancy_id = c.tenancy_id
+           JOIN units u ON u.unit_id = t.unit_id
+           JOIN data_snapshots s ON s.snapshot_id = t.snapshot_id
+           JOIN v_latest_rent_roll_snapshot latest
+               ON latest.property_id = u.property_id AND latest.as_of_date = s.as_of_date
+           WHERE cc.category != 'concession'
+           GROUP BY u.program_type
+           ORDER BY amount DESC"""
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
 @app.get("/revenue/{property_id}")
 def property_revenue(property_id: str, conn=Depends(get_connection)):
     prop = conn.execute(
@@ -238,6 +264,106 @@ def anomalies(property_id: Optional[str] = None, conn=Depends(get_connection)):
     query += " ORDER BY flagged_at DESC"
 
     rows = conn.execute(query, params).fetchall()
+    return [dict(r) for r in rows]
+
+
+@app.get("/occupancy/portfolio")
+def occupancy_portfolio(conn=Depends(get_connection)):
+    """Portfolio-wide occupancy, from unit_availability_snapshots -- data that's been
+    loaded since the beginning but never surfaced anywhere in the dashboard until now.
+    Sums units/occupied per property first (a property can have multiple program-type
+    snapshots, e.g. residential + affordable), then computes a weighted pct_occ rather
+    than averaging the per-program percentages, which would misrepresent properties
+    with very differently sized programs."""
+    rows = conn.execute(
+        """SELECT p.property_id, p.canonical_name,
+                  SUM(ua.total_units) AS total_units,
+                  SUM(ua.occupied_no_notice) AS occupied,
+                  SUM(ua.vacant_rented) + SUM(ua.vacant_unrented) AS vacant,
+                  SUM(ua.notice_rented) + SUM(ua.notice_unrented) AS on_notice
+           FROM unit_availability_snapshots ua
+           JOIN properties p ON p.property_id = ua.property_id
+           GROUP BY p.property_id
+           ORDER BY p.property_id"""
+    ).fetchall()
+
+    by_property = []
+    total_units_all = total_occupied_all = 0
+    for r in rows:
+        d = dict(r)
+        d["pct_occ"] = round(100 * d["occupied"] / d["total_units"], 1) if d["total_units"] else None
+        by_property.append(d)
+        total_units_all += d["total_units"] or 0
+        total_occupied_all += d["occupied"] or 0
+
+    return {
+        "total_units": total_units_all,
+        "total_occupied": total_occupied_all,
+        "pct_occ": round(100 * total_occupied_all / total_units_all, 1) if total_units_all else None,
+        "by_property": by_property,
+    }
+
+
+@app.get("/occupancy/{property_id}")
+def occupancy_property(property_id: str, conn=Depends(get_connection)):
+    prop = conn.execute(
+        "SELECT canonical_name FROM properties WHERE property_id = ?", (property_id,)
+    ).fetchone()
+    if prop is None:
+        raise HTTPException(status_code=404, detail=f"Unknown property_id: {property_id}")
+
+    row = conn.execute(
+        """SELECT SUM(total_units) AS total_units, SUM(occupied_no_notice) AS occupied,
+                  SUM(vacant_rented) + SUM(vacant_unrented) AS vacant,
+                  SUM(notice_rented) + SUM(notice_unrented) AS on_notice,
+                  AVG(avg_rent) AS avg_rent, AVG(avg_sq_ft) AS avg_sq_ft
+           FROM unit_availability_snapshots WHERE property_id = ?""",
+        (property_id,),
+    ).fetchone()
+    d = dict(row) if row else {}
+    total_units = d.get("total_units") or 0
+    occupied = d.get("occupied") or 0
+    return {
+        "property_id": property_id,
+        "canonical_name": prop["canonical_name"],
+        "total_units": total_units,
+        "occupied": occupied,
+        "vacant": d.get("vacant") or 0,
+        "on_notice": d.get("on_notice") or 0,
+        "pct_occ": round(100 * occupied / total_units, 1) if total_units else None,
+        "avg_rent": d.get("avg_rent"),
+        "avg_sq_ft": d.get("avg_sq_ft"),
+    }
+
+
+@app.get("/properties/{property_id}/units")
+def property_units(property_id: str, conn=Depends(get_connection)):
+    """Unit-level drill-down for a property -- the second layer under the property view.
+    Joins each unit to its current-section tenancy from that unit's program's latest
+    rent-roll snapshot, so vacant units show with no tenancy fields rather than being
+    dropped."""
+    prop = conn.execute(
+        "SELECT canonical_name FROM properties WHERE property_id = ?", (property_id,)
+    ).fetchone()
+    if prop is None:
+        raise HTTPException(status_code=404, detail=f"Unknown property_id: {property_id}")
+
+    rows = conn.execute(
+        """SELECT u.unit_id, u.unit_number, u.unit_type, u.program_type, u.sq_ft,
+                  t.status, t.resident_name, t.market_rent, t.balance, t.lease_expiration
+           FROM units u
+           LEFT JOIN tenancies t ON t.unit_id = u.unit_id
+               AND t.section = 'current'
+               AND t.snapshot_id = (
+                   SELECT s.snapshot_id FROM data_snapshots s
+                   WHERE s.property_id = u.property_id AND s.program_type = u.program_type
+                     AND s.source_type = 'rent_roll'
+                   ORDER BY s.as_of_date DESC LIMIT 1
+               )
+           WHERE u.property_id = ?
+           ORDER BY u.unit_number""",
+        (property_id,),
+    ).fetchall()
     return [dict(r) for r in rows]
 
 

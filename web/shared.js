@@ -124,3 +124,172 @@ async function api(path) {
   if (!res.ok) throw new Error(`${path} -> ${res.status}`);
   return res.json();
 }
+
+/* ── horizontal bar chart w/ hover tooltip, draws in on scroll-into-view. Used for
+   both revenue ($) and occupancy (%) -- `fmt` controls the value formatter and the
+   getter functions pull the right fields off each row. ── */
+function drawBarChart(cv, tipEl, data, opts) {
+  const { getValue, getLabel, fmt, tooltipLabel, progress = 1 } = opts;
+  const rowH = 30;
+  cv.style.height = data.length * rowH + 10 + "px";
+  const { ctx, w, h } = fitCanvas(cv);
+  ctx.clearRect(0, 0, w, h);
+  const max = Math.max(...data.map(getValue)) || 1;
+  const narrow = w < 420;
+  const labelW = narrow ? Math.round(w * 0.34) : 190;
+  const amtW = narrow ? Math.round(w * 0.22) : 100;
+  const maxLabelChars = narrow ? 10 : 22;
+  const barMaxW = Math.max(20, w - labelW - amtW - 16);
+
+  ctx.font = `500 ${narrow ? 11 : 12.5}px 'Instrument Sans'`;
+  ctx.textBaseline = "middle";
+
+  const rows = data.map((d, i) => {
+    const y = i * rowH + rowH / 2 + 5;
+    const value = getValue(d);
+    const fullBarW = Math.max(4, (value / max) * barMaxW);
+    const barW = fullBarW * progress;
+
+    ctx.fillStyle = "#9aa3b0";
+    const rawLabel = getLabel(d);
+    const label = rawLabel.length > maxLabelChars ? rawLabel.slice(0, maxLabelChars - 1) + "…" : rawLabel;
+    ctx.fillText(label, 0, y);
+
+    const trackX = labelW;
+    ctx.fillStyle = "rgba(148,163,184,.12)";
+    ctx.beginPath();
+    ctx.roundRect(trackX, y - 4.5, barMaxW, 9, 99);
+    ctx.fill();
+
+    const grad = ctx.createLinearGradient(trackX, 0, trackX + Math.max(barW, 1), 0);
+    grad.addColorStop(0, "#6fd2ff");
+    grad.addColorStop(1, "#3fa9e8");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.roundRect(trackX, y - 4.5, barW, 9, 99);
+    ctx.fill();
+
+    if (progress > 0.6) {
+      ctx.fillStyle = "#f4f6f9";
+      ctx.font = `600 ${narrow ? 10.5 : 12}px 'JetBrains Mono'`;
+      ctx.globalAlpha = Math.min(1, (progress - 0.6) / 0.4);
+      ctx.textAlign = "right";
+      ctx.fillText(fmt(value), w, y);
+      ctx.textAlign = "left";
+      ctx.globalAlpha = 1;
+      ctx.font = `500 ${narrow ? 11 : 12.5}px 'Instrument Sans'`;
+    }
+
+    return { y, top: i * rowH, bottom: (i + 1) * rowH, d, value };
+  });
+
+  cv.onmousemove = (e) => {
+    const rect = cv.getBoundingClientRect();
+    const my = e.clientY - rect.top;
+    const row = rows.find((r) => my >= r.top && my < r.bottom);
+    if (!row) { tipEl.classList.remove("on"); return; }
+    tipEl.classList.add("on");
+    tipEl.style.left = e.clientX - rect.left + "px";
+    tipEl.style.top = row.y + "px";
+    tipEl.innerHTML = `<b>${getLabel(row.d)}</b><br>${fmt(row.value)} ${tooltipLabel || ""}`;
+  };
+  cv.onmouseleave = () => tipEl.classList.remove("on");
+}
+
+function drawRevenueChart(cv, tipEl, data, progress = 1) {
+  drawBarChart(cv, tipEl, data, {
+    getValue: (d) => d.net_effective_revenue,
+    getLabel: (d) => d.canonical_name,
+    fmt: fmtMoney,
+    tooltipLabel: "net effective",
+    progress,
+  });
+}
+
+function drawOccupancyChart(cv, tipEl, data, progress = 1) {
+  drawBarChart(cv, tipEl, data, {
+    getValue: (d) => d.pct_occ || 0,
+    getLabel: (d) => d.canonical_name,
+    fmt: (v) => v.toFixed(1) + "%",
+    tooltipLabel: "occupied",
+    progress,
+  });
+}
+
+/* ── donut chart, sweeps in on scroll-into-view ── */
+const CATEGORY_COLORS = {
+  base_rent: "#6fd2ff",
+  ancillary: "#94a3b8",
+  utility: "#34d399",
+  commercial: "#f0b429",
+  subsidy: "#a78bfa",
+  fee: "#f87171",
+  concession: "#5e6673",
+  residential: "#6fd2ff",
+  affordable: "#a78bfa",
+  land: "#5e6673",
+};
+function drawDonut(cv, byCategory, progress = 1, key = "category") {
+  const { ctx, w, h } = fitCanvas(cv);
+  ctx.clearRect(0, 0, w, h);
+  const cx = w / 2, cy = h / 2, r = Math.min(w, h) / 2 - 8, inner = r * 0.62;
+  const positive = byCategory.filter((c) => c.amount > 0);
+  const total = positive.reduce((s, c) => s + c.amount, 0);
+  let angle = -Math.PI / 2;
+  positive.forEach((c) => {
+    const slice = (c.amount / total) * Math.PI * 2 * progress;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, angle, angle + slice);
+    ctx.arc(cx, cy, inner, angle + slice, angle, true);
+    ctx.closePath();
+    ctx.fillStyle = CATEGORY_COLORS[c[key]] || "#6fd2ff";
+    ctx.fill();
+    angle += slice;
+  });
+}
+function renderDonutLegend(legendEl, byCategory, key = "category") {
+  legendEl.innerHTML = [...byCategory].sort((a, b) => b.amount - a.amount).map((c) => `
+    <div class="dl-row">
+      <span class="dl-sw" style="background:${CATEGORY_COLORS[c[key]] || "#6fd2ff"}"></span>
+      <span class="dl-name">${c[key].replace("_", " ")}</span>
+      <span class="dl-amt mono">${fmtMoneySigned(c.amount)}</span>
+    </div>
+  `).join("");
+}
+
+/* ── risk lists (delinquent balances / lease rollover), reused on both the product
+   page (portfolio-wide) and the dashboard (portfolio-wide or property-scoped). ── */
+function renderDelinquentList(elId, rows) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (!rows.length) {
+    el.innerHTML = `<div class="risk-empty">No outstanding balances.</div>`;
+    return;
+  }
+  el.innerHTML = rows.slice(0, 8).map((r) => `
+    <div class="risk-row">
+      <div class="rr-name">
+        <div class="rr-prop">${r.resident_name || "—"} &middot; ${r.property_id}/${r.unit_number}</div>
+        <div class="rr-sub">unit ${r.unit_number}</div>
+      </div>
+      <div class="rr-amt">${fmtMoney(r.balance)}</div>
+    </div>
+  `).join("");
+}
+function renderLeaseList(elId, rows) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (!rows.length) {
+    el.innerHTML = `<div class="risk-empty">No leases expiring in this window.</div>`;
+    return;
+  }
+  el.innerHTML = rows.slice(0, 8).map((r) => `
+    <div class="risk-row">
+      <div class="rr-name">
+        <div class="rr-prop">${r.resident_name || "—"} &middot; ${r.property_id}/${r.unit_number}</div>
+        <div class="rr-sub">expires ${r.lease_expiration}</div>
+      </div>
+      <div class="rr-amt warn">${r.market_rent ? fmtMoney(r.market_rent) : "—"}</div>
+    </div>
+  `).join("");
+}

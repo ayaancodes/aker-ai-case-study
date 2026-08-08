@@ -1,36 +1,3 @@
-/* ── ambient bar visual, used for the gate's canvas ── */
-function ambientBars(cv, values, opts = {}) {
-  const color = opts.color || "111,210,255";
-  let t = 0, visible = true;
-  new IntersectionObserver((e) => (visible = e[0].isIntersecting)).observe(cv);
-  function frame() {
-    requestAnimationFrame(frame);
-    if (!visible) return;
-    const { ctx, w, h } = fitCanvas(cv);
-    ctx.clearRect(0, 0, w, h);
-    if (!values.length) return;
-    t += REDUCED ? 0 : 0.012;
-    const max = Math.max(...values);
-    const n = values.length;
-    const gap = w / n;
-    const barW = gap * 0.52;
-    values.forEach((v, i) => {
-      const bob = REDUCED ? 0 : Math.sin(t + i * 0.5) * 5;
-      const bh = Math.max(6, (v / max) * (h * 0.72)) + bob;
-      const x = i * gap + (gap - barW) / 2;
-      const y = h - bh;
-      const grad = ctx.createLinearGradient(0, y, 0, h);
-      grad.addColorStop(0, `rgba(${color},.85)`);
-      grad.addColorStop(1, `rgba(${color},.08)`);
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.roundRect(x, y, barW, bh, [4, 4, 0, 0]);
-      ctx.fill();
-    });
-  }
-  frame();
-}
-
 /* ── perspective particle field, adapted from Vega's hero background (2D canvas
    version, permission granted to reuse/adapt) -- purely atmospheric motion, the
    only visual in the hero besides the headline itself. ── */
@@ -77,112 +44,6 @@ function particleField(cv) {
   frame();
 }
 
-/* ── horizontal revenue bar chart with hover tooltip, draws in on scroll-into-view ── */
-function drawRevenueChart(cv, tipEl, data, progress = 1) {
-  const rowH = 30;
-  cv.style.height = data.length * rowH + 10 + "px";
-  const { ctx, w, h } = fitCanvas(cv);
-  ctx.clearRect(0, 0, w, h);
-  const max = Math.max(...data.map((d) => d.net_effective_revenue));
-  const narrow = w < 420;
-  const labelW = narrow ? Math.round(w * 0.34) : 190;
-  const amtW = narrow ? Math.round(w * 0.22) : 100;
-  const maxLabelChars = narrow ? 10 : 22;
-  const barMaxW = Math.max(20, w - labelW - amtW - 16);
-
-  ctx.font = `500 ${narrow ? 11 : 12.5}px 'Instrument Sans'`;
-  ctx.textBaseline = "middle";
-
-  const rows = data.map((d, i) => {
-    const y = i * rowH + rowH / 2 + 5;
-    const fullBarW = Math.max(4, (d.net_effective_revenue / max) * barMaxW);
-    const barW = fullBarW * progress;
-
-    ctx.fillStyle = "#9aa3b0";
-    const label = d.canonical_name.length > maxLabelChars
-      ? d.canonical_name.slice(0, maxLabelChars - 1) + "…"
-      : d.canonical_name;
-    ctx.fillText(label, 0, y);
-
-    const trackX = labelW;
-    ctx.fillStyle = "rgba(148,163,184,.12)";
-    ctx.beginPath();
-    ctx.roundRect(trackX, y - 4.5, barMaxW, 9, 99);
-    ctx.fill();
-
-    const grad = ctx.createLinearGradient(trackX, 0, trackX + Math.max(barW, 1), 0);
-    grad.addColorStop(0, "#6fd2ff");
-    grad.addColorStop(1, "#3fa9e8");
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.roundRect(trackX, y - 4.5, barW, 9, 99);
-    ctx.fill();
-
-    if (progress > 0.6) {
-      ctx.fillStyle = "#f4f6f9";
-      ctx.font = `600 ${narrow ? 10.5 : 12}px 'JetBrains Mono'`;
-      ctx.globalAlpha = Math.min(1, (progress - 0.6) / 0.4);
-      ctx.textAlign = "right";
-      ctx.fillText(fmtMoney(d.net_effective_revenue), w, y);
-      ctx.textAlign = "left";
-      ctx.globalAlpha = 1;
-      ctx.font = `500 ${narrow ? 11 : 12.5}px 'Instrument Sans'`;
-    }
-
-    return { y, top: i * rowH, bottom: (i + 1) * rowH, d };
-  });
-
-  cv.onmousemove = (e) => {
-    const rect = cv.getBoundingClientRect();
-    const my = e.clientY - rect.top;
-    const row = rows.find((r) => my >= r.top && my < r.bottom);
-    if (!row) { tipEl.classList.remove("on"); return; }
-    tipEl.classList.add("on");
-    tipEl.style.left = e.clientX - rect.left + "px";
-    tipEl.style.top = row.y + "px";
-    tipEl.innerHTML = `<b>${row.d.canonical_name}</b><br>${fmtMoney(row.d.net_effective_revenue)} net effective`;
-  };
-  cv.onmouseleave = () => tipEl.classList.remove("on");
-}
-
-/* ── donut chart, sweeps in on scroll-into-view ── */
-const CATEGORY_COLORS = {
-  base_rent: "#6fd2ff",
-  ancillary: "#94a3b8",
-  utility: "#34d399",
-  commercial: "#f0b429",
-  subsidy: "#a78bfa",
-  fee: "#f87171",
-  concession: "#5e6673",
-};
-function drawDonut(cv, byCategory, progress = 1) {
-  const { ctx, w, h } = fitCanvas(cv);
-  ctx.clearRect(0, 0, w, h);
-  const cx = w / 2, cy = h / 2, r = Math.min(w, h) / 2 - 8, inner = r * 0.62;
-  const positive = byCategory.filter((c) => c.amount > 0);
-  const total = positive.reduce((s, c) => s + c.amount, 0);
-  let angle = -Math.PI / 2;
-  positive.forEach((c) => {
-    const slice = (c.amount / total) * Math.PI * 2 * progress;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, angle, angle + slice);
-    ctx.arc(cx, cy, inner, angle + slice, angle, true);
-    ctx.closePath();
-    ctx.fillStyle = CATEGORY_COLORS[c.category] || "#6fd2ff";
-    ctx.fill();
-    angle += slice;
-  });
-}
-function renderDonutLegend(legendEl, byCategory) {
-  legendEl.innerHTML = [...byCategory].sort((a, b) => b.amount - a.amount).map((c) => `
-    <div class="dl-row">
-      <span class="dl-sw" style="background:${CATEGORY_COLORS[c.category] || "#6fd2ff"}"></span>
-      <span class="dl-name">${c.category.replace("_", " ")}</span>
-      <span class="dl-amt mono">${fmtMoneySigned(c.amount)}</span>
-    </div>
-  `).join("");
-}
-
 async function init() {
   const [revenue, properties, delinquent, leases] = await Promise.all([
     api("/revenue/portfolio"),
@@ -195,13 +56,12 @@ async function init() {
 
   renderTicker(sortedByRevenue);
   particleField(document.getElementById("heroField"));
-  renderGate(sortedByRevenue, revenue.total_net_effective_revenue);
   initExplorer(properties, sortedByRevenue);
   renderRevenueChart(revenue, sortedByRevenue);
   renderDonut(revenue.by_category);
   renderMarquee(sortedByRevenue);
-  renderDelinquent(delinquent);
-  renderLeases(leases.leases);
+  renderDelinquentList("delinquentList", delinquent);
+  renderLeaseList("leaseList", leases.leases);
 
   const first = await api(`/properties/${sortedByRevenue[0].property_id}`);
   const asOfDate = first?.latest_as_of_date?.rent_roll;
@@ -225,12 +85,6 @@ function renderTicker(sorted) {
       <span class="px mono">${fmtMoney(p.net_effective_revenue)}</span>
     </span>`;
   }).join("");
-}
-
-function renderGate(sorted, totalRevenue) {
-  const cv = document.getElementById("gateChart");
-  ambientBars(cv, sorted.map((p) => p.net_effective_revenue), { color: "111,210,255" });
-  document.getElementById("gateRevenue").textContent = fmtMoney(totalRevenue);
 }
 
 function renderRevenueChart(revenue, sorted) {
@@ -333,43 +187,9 @@ function renderMarquee(sorted) {
   document.getElementById("mq2").innerHTML = sorted.slice(half).concat(sorted.slice(half)).map(cardHtml).join("");
 }
 
-function renderDelinquent(rows) {
-  const el = document.getElementById("delinquentList");
-  if (!rows.length) {
-    el.innerHTML = `<div class="risk-empty">No outstanding balances.</div>`;
-    return;
-  }
-  el.innerHTML = rows.slice(0, 8).map((r) => `
-    <div class="risk-row">
-      <div class="rr-name">
-        <div class="rr-prop">${r.resident_name || "—"} &middot; ${r.property_id}/${r.unit_number}</div>
-        <div class="rr-sub">unit ${r.unit_number}</div>
-      </div>
-      <div class="rr-amt">${fmtMoney(r.balance)}</div>
-    </div>
-  `).join("");
-}
-
-function renderLeases(rows) {
-  const el = document.getElementById("leaseList");
-  if (!rows.length) {
-    el.innerHTML = `<div class="risk-empty">No leases expiring in this window.</div>`;
-    return;
-  }
-  el.innerHTML = rows.slice(0, 8).map((r) => `
-    <div class="risk-row">
-      <div class="rr-name">
-        <div class="rr-prop">${r.resident_name || "—"} &middot; ${r.property_id}/${r.unit_number}</div>
-        <div class="rr-sub">expires ${r.lease_expiration}</div>
-      </div>
-      <div class="rr-amt warn">${r.market_rent ? fmtMoney(r.market_rent) : "—"}</div>
-    </div>
-  `).join("");
-}
-
-/* ── entry gate dismiss (cosmetic only, no real auth) ── */
+/* ── entry gate (cosmetic only, no real auth) -- takes you to the dashboard ── */
 document.getElementById("gateEnter").addEventListener("click", () => {
-  document.getElementById("gate").classList.add("hidden");
+  window.location.href = "dashboard.html";
 });
 
 init().catch((err) => {

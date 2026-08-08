@@ -13,25 +13,14 @@
 
 <div class="cursor-glow" id="cursorGlow"></div>
 
-<!-- ───────── ENTRY GATE (cosmetic only, no real auth) ───────── -->
+<!-- ───────── ENTRY GATE (cosmetic only, no real auth) — docked over the visible
+     landing page, not a full-screen takeover. "Enter" goes to the dashboard. ───────── -->
 <div class="gate" id="gate">
-  <div class="gate-visual">
-    <canvas id="gateChart"></canvas>
-    <div class="gate-mark">
-      <span class="logo-mark">A</span>
-      <span class="gate-brand">Aker <em>Terminal</em></span>
-    </div>
-    <div class="gate-float" id="gateFloat">
-      <div class="gf-k">NET EFFECTIVE REVENUE</div>
-      <div class="gf-v mono" id="gateRevenue">&mdash;</div>
-      <div class="gf-sub mono">15 PROPERTIES</div>
-    </div>
-  </div>
   <div class="gate-form">
     <div class="gate-form-in">
       <div class="gate-eyebrow">PORTFOLIO TERMINAL</div>
       <h2>Welcome back.</h2>
-      <p>Sign in to view the portfolio.</p>
+      <p>Sign in to open the dashboard.</p>
       <label class="gate-label">Email</label>
       <input class="gate-input" type="email" placeholder="you@aker.com" autocomplete="off">
       <label class="gate-label">Password</label>
