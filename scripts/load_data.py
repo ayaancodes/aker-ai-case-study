@@ -60,6 +60,12 @@ CHARGE_EXPECTED_STATUSES = {"occupied", "notice"}
 # silently passing under a threshold the way the original 50%-cliff boolean check did.
 MISSING_CHARGES_SEVERE_THRESHOLD = 0.5
 
+# A lease_expiration this many years past the file's as-of date gets flagged as an
+# implausible date. Wide enough that a real long commercial lease (143c holds one
+# ending 2040, ~14 years out) passes, narrow enough to catch outright typos (143c
+# also holds one "ending" 2626-06-30).
+IMPLAUSIBLE_LEASE_YEARS = 30
+
 
 def load_rent_roll_file(conn, filepath):
     filename = os.path.basename(filepath)
@@ -111,18 +117,25 @@ def load_rent_roll_file(conn, filepath):
     # portfolio showed this isn't a one-off: 5 of 15 properties have 100% or near-100%
     # of occupied tenancies missing charges entirely (see CLAUDE.md edge cases).
     #
-    # Two gaps in this check were found by a later audit and fixed here:
+    # Three gaps in this check were found after it first shipped, each the same shape
+    # (a filter that silently excluded rows the check existed to catch):
     #   1. It only looked at status == 'occupied', missing the identical pattern among
     #      'notice' status tenants (same real resident, same real rent, still excluded).
     #   2. It was a boolean gated at >50%, so a property with e.g. 35% of its charges
     #      missing loaded clean with zero signal anywhere. The ratio is now always
     #      computed and stored (pct_value) whenever it's nonzero, with flag_type only
     #      distinguishing "severe" from "partial" -- never hiding the number itself.
+    #   3. It required market_rent > 0, which excluded commercial tenancies where the
+    #      market_rent field simply isn't populated (0 across 26 commercial units in
+    #      139c/143c/153c). The unit carrying the single largest delinquent balance in
+    #      the whole portfolio ($178,806.41, The Mill Greenwich 328-104) is an occupied
+    #      commercial unit with market_rent 0 and zero charge lines -- completely
+    #      invisible to this check until the filter was dropped. An occupied or notice
+    #      tenant with no recorded charges is a revenue gap regardless of whether the
+    #      market_rent field happens to be filled in.
     billable = [
         u for u in parsed["units"]
-        if u["section"] == "current"
-        and u["status"] in CHARGE_EXPECTED_STATUSES
-        and (u["market_rent"] or 0) > 0
+        if u["section"] == "current" and u["status"] in CHARGE_EXPECTED_STATUSES
     ]
     missing_charges = [u for u in billable if not u["charges"]]
     if billable and missing_charges:
@@ -135,10 +148,35 @@ def load_rent_roll_file(conn, filepath):
         db.add_flag(
             conn, property_id, snapshot_id, flag_type,
             f"{len(missing_charges)} of {len(billable)} occupied/notice tenancies "
-            f"({pct:.1f}%) have zero recorded charges despite nonzero market rent -- "
-            f"revenue for this property/program is understated",
+            f"({pct:.1f}%) have zero recorded charge lines -- revenue for this "
+            f"property/program is understated",
             pct_value=ratio,
         )
+
+    # Date sanity. Two contradiction classes actually present in the source files:
+    # a move_in later than the same row's lease_expiration (6 rows across 175r/462a --
+    # a renewal never updated the expiration while move_in reflects the newer lease),
+    # and a lease_expiration absurdly far in the future (143c unit 1-114 expires
+    # 2626-06-30, an obvious typo for 2026). The 30-year horizon is deliberate: 143c
+    # also holds a legitimate 2040 commercial lease (~14 years out), which a tighter
+    # bound would false-positive on. ISO date strings compare correctly as text.
+    for unit in parsed["units"]:
+        move_in, lease_exp = unit["move_in"], unit["lease_expiration"]
+        problems = []
+        if move_in and lease_exp and move_in > lease_exp:
+            problems.append(f"move_in {move_in} is after lease_expiration {lease_exp}")
+        if lease_exp and parsed["as_of_date"]:
+            horizon_year = int(parsed["as_of_date"][:4]) + IMPLAUSIBLE_LEASE_YEARS
+            if int(lease_exp[:4]) > horizon_year:
+                problems.append(
+                    f"lease_expiration {lease_exp} is more than "
+                    f"{IMPLAUSIBLE_LEASE_YEARS} years past the as-of date"
+                )
+        if problems:
+            db.add_flag(
+                conn, property_id, snapshot_id, "implausible_dates",
+                f"unit {unit['unit_number']}: " + "; ".join(problems),
+            )
 
     conn.commit()
     return {

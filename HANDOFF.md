@@ -226,9 +226,18 @@ Everything below is built, tested against the real 25+25 source files, and pushe
   soon"; fixed to bound both ends.
 - **`altapm` is a structurally empty placeholder property** (zero unit rows) — not a
   real building.
+- **The missing_charges check had a third blind spot** (found in a later deliberate
+  re-audit): its `market_rent > 0` filter excluded commercial tenancies where that
+  field isn't populated — including the unit carrying the portfolio's single largest
+  delinquent balance ($178,806.41, The Mill Greenwich 328-104, occupied, zero charges).
+  Filter dropped; 139 now carries a `missing_charges_partial` flag.
+- **Impossible dates exist in the source files**: 6 tenancies with move_in after
+  lease_expiration, and one lease "expiring" 2626-06-30 (typo for 2026). Flagged at
+  load time as `implausible_dates`; the 30-year threshold deliberately spares a
+  legitimate 2040 commercial lease.
 
-Full detail with exact numbers and how each was found lives in `CLAUDE.md` sections 1
-and 6.
+Full detail with exact numbers and how each was found lives in `CLAUDE.md` sections 1,
+6, and 7.
 
 ---
 

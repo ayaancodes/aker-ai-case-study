@@ -417,6 +417,44 @@ parsing path — not just against the database's own internal consistency.
 
 ---
 
+## 7. Second data-quality pass: the check's third blind spot, and impossible dates
+
+**Goal:** a deliberate re-investigation on the assumption that more gaps existed —
+prompted by the pattern in section 6, not by any visible symptom.
+
+**Approach:** fresh reload, then a battery of full-dataset sanity queries that no
+existing check covered: date-order contradictions, zero-rent billable tenancies,
+charges attached to non-billable rows, negative deposits, absurd date values.
+
+### Result: two real finds, both fixed with load-time flags + regression tests
+- **The missing_charges check had a third blind spot: `market_rent > 0`.** The filter
+  excluded 26 commercial tenancies (139c/143c/153c) where the market_rent field simply
+  isn't populated for commercial leases. One of them — The Mill Greenwich unit 328-104,
+  occupied, market_rent 0, zero charge lines — is the unit carrying **the single
+  largest delinquent balance in the entire portfolio ($178,806.41)**, and it was
+  invisible to the revenue-completeness check the whole time. Fixed: "billable" is now
+  simply current-section occupied/notice, no market_rent condition — a real tenant
+  with no recorded charges is a revenue gap regardless of whether that field is filled
+  in. 139 now carries a `missing_charges_partial` flag (1 of 10, 10%); the 5 known
+  severe properties' counts are unchanged (their tenancies all have market_rent > 0).
+  Same lesson as the notice-status fix: ask what makes a check pass on data you'd
+  still consider broken.
+- **Source files contain genuinely impossible dates.** 6 tenancies (1 in `175r`, 5 in
+  `462a`) have move_in *after* lease_expiration — a renewal that never updated the
+  expiration field while move_in reflects the newer lease. And `143c` unit 1-114 has a
+  lease "expiring" **2626-06-30**, an obvious typo for 2026. New `implausible_dates`
+  flag at load time catches both classes. The far-future threshold is 30 years past
+  the as-of date on purpose: `143c` also holds a legitimate ~14-year commercial lease
+  ending 2040 which a tighter bound would false-positive on.
+- Checked and deliberately NOT flagged: 8 future-section applicants with move_in just
+  before the as-of date (administrative lag, not corruption), and one future applicant
+  in `462a` with a SUBSIDY/SEC8CRD charge pair netting to zero (pre-booked subsidy,
+  consistent with its stated Total of 0).
+- Flags grew from 11 to 19 (7 `implausible_dates` + 1 new `missing_charges_partial`).
+  Tests grew from 36 to 38, all passing; the two new tests lock in both finds.
+
+---
+
 ## Reference
 
 ### Tooling defaults

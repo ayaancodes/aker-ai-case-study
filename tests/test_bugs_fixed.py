@@ -132,3 +132,37 @@ def test_missing_charges_pct_value_always_stored_and_matches_detail(real_conn):
             assert pct_value > 0.5
         elif flag_type == "missing_charges_partial":
             assert pct_value <= 0.5
+
+
+def test_missing_charges_covers_zero_market_rent_commercial(real_conn):
+    """Bug (third blind spot in this same check): the billable filter required
+    market_rent > 0, which excluded commercial tenancies where that field simply isn't
+    populated. The unit with the single largest delinquent balance in the portfolio
+    (The Mill Greenwich 328-104, $178,806.41) is occupied with market_rent 0 and zero
+    charge lines, and was invisible to the check until the filter was dropped."""
+    row = real_conn.execute(
+        """SELECT flag_type, pct_value FROM data_quality_flags
+           WHERE property_id = '139' AND flag_type LIKE 'missing_charges%'"""
+    ).fetchone()
+    assert row is not None, (
+        "139c's occupied zero-rent zero-charge unit (the portfolio's top delinquency) "
+        "should produce a missing_charges flag despite market_rent being 0"
+    )
+    flag_type, pct_value = row
+    assert flag_type == "missing_charges_partial"
+    assert pct_value is not None and 0 < pct_value <= 0.5
+
+
+def test_implausible_dates_flagged(real_conn):
+    """Source files contain genuinely contradictory dates: 6 tenancies whose move_in is
+    after their lease_expiration (175r, 462a), and one lease 'expiring' 2626-06-30
+    (143c unit 1-114 -- an obvious typo for 2026). These must be flagged at load time.
+    The threshold must NOT flag 143c's legitimate long commercial lease ending 2040."""
+    rows = real_conn.execute(
+        "SELECT property_id, detail FROM data_quality_flags WHERE flag_type = 'implausible_dates'"
+    ).fetchall()
+    details = " | ".join(d for _, d in rows)
+    assert any("2626-06-30" in d for _, d in rows), "the year-2626 lease typo must be flagged"
+    movein_after = [d for _, d in rows if "is after lease_expiration" in d]
+    assert len(movein_after) == 6, f"expected 6 move_in-after-expiration rows, got {len(movein_after)}"
+    assert "2040" not in details, "the legitimate ~14-year commercial lease (2040) must not be flagged"
