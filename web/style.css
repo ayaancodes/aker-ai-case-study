@@ -372,6 +372,14 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;position:relative;z-
   background:rgba(111,210,255,.08);border:1px solid rgba(111,210,255,.25);border-radius:99px;
   padding:3px 10px;display:inline-flex;width:fit-content;margin-left:35px}
 
+/* grounding check: a $/% figure the model stated that didn't trace back to any tool
+   result this turn. Not blocking -- flagged, same as a data quality issue elsewhere
+   in this app. Should be rare; if this shows up often, the check or the prompt needs
+   attention, not the user. */
+.copilot-grounding-warn{font-family:'JetBrains Mono';font-size:10px;color:var(--loss);
+  background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.25);border-radius:8px;
+  padding:5px 10px;margin-left:35px;max-width:calc(100% - 35px)}
+
 /* ── data cards: rendered straight from the tool_result SSE payload, client-side,
    no LLM tokens involved -- real tables/bars from the actual API response, not the
    model describing them in prose. ── */

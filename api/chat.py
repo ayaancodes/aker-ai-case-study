@@ -11,7 +11,9 @@ Model: claude-haiku-4-5-20251001. Cheap/fast tier on purpose -- this is a scoped
 """
 
 import json
+import logging
 import os
+import re
 import sqlite3
 
 from anthropic import Anthropic
@@ -21,6 +23,8 @@ from pydantic import BaseModel
 from api.db import DB_PATH
 
 load_dotenv()
+
+logger = logging.getLogger("aker.chat.grounding")
 
 MODEL = "claude-haiku-4-5-20251001"
 MAX_TOKENS = 450
@@ -225,6 +229,83 @@ def describe_tool_call(name, args):
     return fn(args) if fn else f"Calling {name}"
 
 
+# ── grounding check ──────────────────────────────────────────────────────────────
+# Every hallucination the QA pass found was a specific, checkable claim (a dollar
+# figure, a property name, a made-up location). Names/locations are now handled by
+# giving the model correct data and telling it not to invent attributes -- there's no
+# mechanical way to verify a proper noun. But dollar amounts and percentages ARE
+# mechanically checkable: after the model writes its final answer, every $ and %
+# figure it stated gets compared against the actual tool results returned this turn
+# (with tolerance, since "$7.56M" is a legitimate rounding of 7,559,862.25). Anything
+# that doesn't trace back to real data gets flagged to the frontend and logged --
+# never silently trusted, same "surface it, don't hide it" principle as the
+# data_quality_flags table.
+
+_DOLLAR_RE = re.compile(r"\$\s?([\d,]+\.?\d*)\s?([KkMmBb])?\b")
+_PERCENT_RE = re.compile(r"(\d+\.?\d*)\s?%")
+_SUFFIX_MULT = {"k": 1e3, "m": 1e6, "b": 1e9}
+
+
+def _extract_claims(text):
+    """Returns a list of (kind, raw_matched_text, parsed_value)."""
+    claims = []
+    for m in _DOLLAR_RE.finditer(text):
+        value = float(m.group(1).replace(",", ""))
+        mult = _SUFFIX_MULT.get((m.group(2) or "").lower(), 1)
+        claims.append(("dollar", m.group(0).strip(), value * mult))
+    for m in _PERCENT_RE.finditer(text):
+        claims.append(("percent", m.group(0).strip(), float(m.group(1))))
+    return claims
+
+
+def _flatten_numbers(obj, out):
+    """Recursively collects every numeric value out of a tool result (dict/list of
+    dicts), plus its absolute value -- a concession or balance is often stored signed
+    in the data but stated as a plain positive figure in prose ('$144K in
+    concessions' for a stored -144087.14)."""
+    if isinstance(obj, bool):
+        return
+    if isinstance(obj, (int, float)):
+        out.add(float(obj))
+        out.add(abs(float(obj)))
+    elif isinstance(obj, dict):
+        for v in obj.values():
+            _flatten_numbers(v, out)
+    elif isinstance(obj, list):
+        for v in obj:
+            _flatten_numbers(v, out)
+
+
+def _is_grounded(kind, value, numbers, rel_tol=0.02):
+    """A claim is grounded if it's within tolerance of some number the model actually
+    saw -- covers exact figures and rounded/abbreviated ones like $7.56M for
+    7,559,862.25. Deliberately NOT doing ratio-of-any-two-numbers matching for percent
+    claims (e.g. treating 88.4% as grounded because SOME pair in the pool happens to
+    divide out near that value): with a dozen-plus numbers in a typical tool result,
+    the pairwise ratio space is dense enough that an accidental match near almost any
+    target percentage is common, not rare -- caught by test_fabricated_percentage_is_
+    flagged in tests/test_chat_grounding.py, which is exactly the false-negative this
+    would reintroduce. The accepted tradeoff: a genuinely correct derived percentage
+    that isn't literally present in the source data (e.g. computed by the model from
+    two raw amounts) gets flagged too. For a trust check, a false positive that just
+    says "couldn't verify" is the safe failure mode -- a false negative that waves a
+    fabricated number through is not."""
+    tol = max(1.0, rel_tol * abs(value))
+    return any(abs(value - n) <= tol for n in numbers)
+
+
+def _check_grounding(text, tool_numbers):
+    """Returns the list of claim strings (e.g. '$178,806.41', '14.3%') that could not
+    be traced to any tool result returned this turn. Deliberately no early-exit on an
+    empty tool_numbers set -- a $ or % claim made with zero tool calls this turn is
+    exactly the case this exists to catch, not a reason to skip checking."""
+    unverified = []
+    for kind, raw, value in _extract_claims(text):
+        if not _is_grounded(kind, value, tool_numbers):
+            unverified.append(raw)
+    return unverified
+
+
 class ChatMessage(BaseModel):
     role: str
     content: str
@@ -290,6 +371,9 @@ def stream_chat(history, tool_dispatch):
         return
 
     messages = [{"role": m.role, "content": m.content} for m in history]
+    # every numeric value seen in any tool result this turn (across every iteration of
+    # the loop below) -- the pool the final answer's $ and % claims get checked against
+    turn_numbers = set()
 
     for _ in range(MAX_TOOL_ITERATIONS):
         try:
@@ -311,6 +395,11 @@ def stream_chat(history, tool_dispatch):
         messages.append({"role": "assistant", "content": final_message.content})
 
         if final_message.stop_reason != "tool_use":
+            final_text = "".join(b.text for b in final_message.content if b.type == "text")
+            unverified = _check_grounding(final_text, turn_numbers)
+            if unverified:
+                logger.warning("Unverified claim(s) in chat response: %s | text=%r", unverified, final_text)
+                yield _sse("grounding", {"unverified": unverified})
             yield _sse("done", {})
             return
 
@@ -330,6 +419,7 @@ def stream_chat(history, tool_dispatch):
                 # full, untouched result -> frontend, rendered as a table/chart. This
                 # never passes through the LLM, so it costs zero extra tokens.
                 yield _sse("tool_result", {"tool": block.name, "result": result})
+                _flatten_numbers(result, turn_numbers)
                 content = json.dumps(_truncate_for_model(result), default=str)
             except Exception as e:
                 is_error = True

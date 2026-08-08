@@ -308,6 +308,18 @@ async function sendMessage() {
           assistantText += data.text;
           assistantEl.innerHTML = formatAssistantText(assistantText);
           scrollToBottom();
+        } else if (event === "grounding") {
+          // server checked every $/% figure the model just stated against the real
+          // tool data it was given this turn -- anything that didn't trace back shows
+          // up here. Not blocking, not hidden either: flagged, same as a data quality
+          // issue in the dashboard itself.
+          if (data.unverified?.length && assistantEl) {
+            const warn = document.createElement("div");
+            warn.className = "copilot-grounding-warn";
+            warn.textContent = `Could not verify against tool data: ${data.unverified.join(", ")}`;
+            assistantEl.closest(".copilot-msg").after(warn);
+            scrollToBottom();
+          }
         } else if (event === "done") {
           if (assistantText) chatHistory.push({ role: "assistant", content: assistantText });
         } else if (event === "error") {
