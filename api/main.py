@@ -10,8 +10,10 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
+from api.chat import ChatRequest, stream_chat
 from api.db import get_connection
 
 app = FastAPI(title="Aker Portfolio API")
@@ -427,6 +429,38 @@ def unit_detail(unit_id: int, conn=Depends(get_connection)):
         "charges": charges,
         "total_charges": sum(c["amount"] for c in charges),
     }
+
+
+TOOL_DISPATCH = {
+    "list_properties": lambda args, conn: list_properties(conn),
+    "get_property": lambda args, conn: get_property(args["property_id"], conn),
+    "portfolio_revenue": lambda args, conn: portfolio_revenue(conn),
+    "revenue_concentration": lambda args, conn: revenue_concentration(conn),
+    "property_revenue": lambda args, conn: property_revenue(args["property_id"], conn),
+    "leases_expiring": lambda args, conn: leases_expiring(args.get("days", 60), args.get("property_id"), conn),
+    "delinquent_tenancies": lambda args, conn: delinquent_tenancies(args.get("min_balance", 0), args.get("property_id"), conn),
+    "anomalies": lambda args, conn: anomalies(args.get("property_id"), conn),
+    "occupancy_portfolio": lambda args, conn: occupancy_portfolio(conn),
+    "occupancy_property": lambda args, conn: occupancy_property(args["property_id"], conn),
+    "property_units": lambda args, conn: property_units(args["property_id"], conn),
+    "unit_detail": lambda args, conn: unit_detail(int(args["unit_id"]), conn),
+    "portfolio_stats": lambda args, conn: portfolio_stats(conn),
+}
+
+
+@app.post("/chat")
+def chat(payload: ChatRequest):
+    """Streams an SSE response: `text_delta` events carry response text as it's
+    generated, `tool_call` events fire before each tool executes (name + a plain-English
+    label, for the frontend's "thinking" indicator), `done` closes out a normal turn,
+    `error` carries anything that went wrong. Every tool is a direct call into the
+    handler functions above -- the chatbot answers through the same code path as the
+    dashboard, never touches SQL on its own."""
+    return StreamingResponse(
+        stream_chat(payload.messages, TOOL_DISPATCH),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.get("/loader-errors")
