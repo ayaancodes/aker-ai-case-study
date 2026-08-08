@@ -97,22 +97,29 @@ Everything below is built, tested against the real 25+25 source files, and pushe
 - Static files (the `web/` directory) are mounted at `/` via FastAPI's StaticFiles,
   after every API route is declared, so it can't shadow them. One deployable service.
 
-### Frontend — three pages, one shared design system
-- **`web/index.html`** — the product landing page. Hero (particle-field background
-  only, no chart competing with the headline), an interactive property explorer
-  (search a property, watch a real gross → concessions → net effective waterfall
-  animate in, see it ranked against the portfolio), revenue chart, revenue mix, risk
-  panels, portfolio marquee. Login is a docked card over the visible hero (not a
-  full-screen takeover), ~30-35% width on the right. Clicking Enter navigates to
-  `dashboard.html`.
+### Frontend — four pages, one shared design system
+- **`web/index.html`** — a small personalized landing: "Welcome back, Moe." over the
+  particle field, a one-line live portfolio pulse from the API, the ticker, and one
+  CTA that opens the sign-in modal (an overlay with its own backdrop — the old docked
+  card was removed after repeated layout collisions with the hero). Clicking Enter
+  navigates to `dashboard.html`. All analytics live behind the terminal, not on the
+  front door.
 - **`web/dashboard.html`** — the actual analytics dashboard, reached after "login."
-  Sidebar property picker + KPI strip. Default view is portfolio-wide (revenue by
-  property, occupancy by property, revenue mix, concentration risk by program type,
-  delinquency, lease rollover). **Selecting a property fully replaces the portfolio
-  view** — not shown side by side, this was an explicit requirement — with that
-  property's own KPIs, revenue waterfall, risk panels, and a **units table as a second
-  drill-down layer** (every unit in that property, status, resident, rent, balance,
-  lease expiration).
+  Sidebar property picker + KPI strip (each tile carries a small real-data visual and
+  a hover popover with detail). Default view is portfolio-wide (revenue by property,
+  occupancy by property, revenue mix, concentration risk by program type, delinquency,
+  lease rollover). **Selecting a property fully replaces the portfolio view** — not
+  shown side by side, this was an explicit requirement — with that property's KPIs
+  and a **units table with search/status/type filters**; clicking a unit opens a
+  detail modal (tenancy facts + real charge lines via `GET /units/{id}`).
+- **`web/copilot.html`** — the AM Copilot chat, its own full page styled after Aker's
+  actual product screenshots (charcoal-green palette, cream text, green/amber accents,
+  scoped via `.copilot-page` CSS variable overrides). Streams from `POST /chat`:
+  throttled typewriter text (time-based, click-to-skip), evidence rendered AFTER the
+  prose finishes, **one data card max per response** with further datasets collapsed
+  into expandable chips, Vega-methodology motion (popin cards, staggered table rows,
+  bar draw-in, one sheen sweep, KPI pass-pulse when the grounding check comes back
+  clean). Grounding flags render amber here.
 - **`web/how-it-works.html`** — the technical/proof page. Data quality stats,
   architecture pillars, pipeline diagram, a **test suite terminal showing real pytest
   output** (not fabricated), anomalies feed. This content used to be on the main
@@ -121,11 +128,10 @@ Everything below is built, tested against the real 25+25 source files, and pushe
   the app." One footer link away from the product page, not the first thing shown.
 - **`web/shared.js`** — cursor-follow spotlight, magnetic buttons, reveal-on-scroll,
   count-up numbers, canvas helpers, the generic bar/donut chart drawing functions, the
-  delinquent/lease list renderers. Used by all three pages so chart logic isn't
-  duplicated.
-- **`web/app.js`**, **`web/dashboard.js`**, **`web/technical.js`** — page-specific
-  logic on top of `shared.js`.
-- **`web/style.css`** — one stylesheet, all three pages, dark mode only (light mode was
+  delinquent/lease list renderers. Shared across pages so chart logic isn't duplicated.
+- **`web/app.js`**, **`web/dashboard.js`**, **`web/chat.js`**, **`web/technical.js`**
+  — page-specific logic on top of `shared.js`.
+- **`web/style.css`** — one stylesheet, all four pages, dark mode only (light mode was
   explicitly removed, don't reintroduce a theme toggle without being asked).
 
 ---

@@ -36,6 +36,7 @@
     </div>
     <div class="nav-cta">
       <span class="hero-note"><span class="live-dot"></span><span id="asOfNote">AS OF &mdash;</span></span>
+      <a class="btn btn-grad" href="copilot.html">AM Copilot</a>
     </div>
   </div>
 </nav>
@@ -134,38 +135,7 @@
   </main>
 </div>
 
-<!-- ───────── COPILOT CHAT — docked bubble bottom-right, slides into a panel over the
-     dashboard. Answers by calling the same API the dashboard uses, streamed via SSE.
-     See web/chat.js. ───────── -->
-<button class="copilot-bubble" id="copilotBubble" aria-label="Open portfolio copilot">
-  <span class="copilot-bubble-mark">A</span>
-</button>
-
-<div class="copilot-panel" id="copilotPanel" aria-hidden="true">
-  <div class="copilot-head">
-    <div class="copilot-head-id">
-      <span class="copilot-avatar">A</span>
-      <div>
-        <div class="copilot-title">Portfolio Copilot</div>
-        <div class="copilot-sub">Answers by calling the live API</div>
-      </div>
-    </div>
-    <button class="copilot-close" id="copilotClose" aria-label="Close">&times;</button>
-  </div>
-  <div class="copilot-messages" id="copilotMessages">
-    <div class="copilot-msg assistant">
-      <span class="copilot-avatar">A</span>
-      <div class="copilot-bubble-text">Ask me about revenue, occupancy, delinquents, lease rollover, or data quality &mdash; anywhere in the portfolio or for one property. I'll call the real API, not guess.</div>
-    </div>
-  </div>
-  <div class="copilot-input-row">
-    <input type="text" id="copilotInput" placeholder="Ask about the portfolio&hellip;" autocomplete="off">
-    <button class="btn btn-grad" id="copilotSend" aria-label="Send">&rarr;</button>
-  </div>
-</div>
-
 <script src="shared.js"></script>
 <script src="dashboard.js"></script>
-<script src="chat.js"></script>
 </body>
 </html>

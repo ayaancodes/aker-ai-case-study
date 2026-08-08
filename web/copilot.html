@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AM Copilot &mdash; Aker Portfolio Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="copilot-page">
+
+<div class="cursor-glow" id="cursorGlow"></div>
+
+<nav id="nav">
+  <div class="nav-in">
+    <a class="logo" href="index.html">
+      <span class="logo-mark">A</span>
+      <span class="logo-name">Aker <em>Terminal</em></span>
+    </a>
+    <div class="nav-cta">
+      <span class="hero-note"><span class="live-dot"></span><span id="asOfNote">AS OF &mdash;</span></span>
+    </div>
+  </div>
+</nav>
+
+<div class="copilot-layout">
+  <aside class="copilot-sidebar">
+    <div class="copilot-side-label">PRODUCT SUITE</div>
+    <a class="copilot-side-link" href="dashboard.html">AM Dashboard</a>
+    <a class="copilot-side-link on" href="copilot.html">AM Copilot</a>
+    <a class="copilot-side-link" href="how-it-works.html">How it's built</a>
+    <a class="copilot-side-link" href="/docs" target="_blank">API reference</a>
+    <div class="copilot-side-foot">EVERY FIGURE TRACES<br>TO A REAL API CALL</div>
+  </aside>
+
+  <main class="copilot-main">
+    <div class="copilot-messages" id="copilotMessages">
+      <div class="copilot-msg assistant">
+        <span class="copilot-avatar">A</span>
+        <div class="copilot-bubble-text">Ask me about revenue, occupancy, delinquents, lease rollover, or data quality &mdash; portfolio-wide or one property. Every number comes from a live API call, and anything I can't verify gets flagged.</div>
+      </div>
+    </div>
+    <div class="copilot-suggest" id="copilotSuggest">
+      <button data-q="Which leases already expired and were never renewed?">Expired, never renewed leases</button>
+      <button data-q="Who owes the most money across the portfolio?">Largest delinquent balances</button>
+      <button data-q="What data problems have you found?">Data quality issues</button>
+    </div>
+    <div class="copilot-input-row">
+      <input type="text" id="copilotInput" placeholder="Ask about the portfolio&hellip;" autocomplete="off">
+      <button class="btn btn-grad" id="copilotSend" aria-label="Send">&rarr;</button>
+    </div>
+  </main>
+</div>
+
+<script src="shared.js"></script>
+<script src="chat.js"></script>
+</body>
+</html>
