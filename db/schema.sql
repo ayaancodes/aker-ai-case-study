@@ -208,17 +208,23 @@ JOIN v_latest_rent_roll_snapshot latest
 GROUP BY u.property_id;
 
 -- Leases expiring soon (current, occupied tenancies with a lease_expiration date),
--- latest period only.
+-- latest period only. unit_id and canonical_name included so consumers (the chatbot
+-- especially) can chain into unit detail and use real property names without a second
+-- lookup -- the copilot QA pass caught it inventing a name ("Sutton Hill") for a code
+-- when the result carried only property_id.
 CREATE VIEW v_lease_expirations AS
 SELECT
     t.tenancy_id,
+    u.unit_id,
     u.property_id,
+    p.canonical_name,
     u.unit_number,
     t.resident_name,
     t.lease_expiration,
     t.market_rent
 FROM tenancies t
 JOIN units u ON u.unit_id = t.unit_id
+JOIN properties p ON p.property_id = u.property_id
 JOIN data_snapshots s ON s.snapshot_id = t.snapshot_id
 JOIN v_latest_rent_roll_snapshot latest
     ON latest.property_id = u.property_id AND latest.as_of_date = s.as_of_date
@@ -226,16 +232,20 @@ WHERE t.section = 'current'
   AND t.status = 'occupied'
   AND t.lease_expiration IS NOT NULL;
 
--- Delinquent tenancies (positive balance owed), latest period only.
+-- Delinquent tenancies (positive balance owed), latest period only. Same unit_id /
+-- canonical_name reasoning as v_lease_expirations above.
 CREATE VIEW v_delinquent_tenancies AS
 SELECT
     t.tenancy_id,
+    u.unit_id,
     u.property_id,
+    p.canonical_name,
     u.unit_number,
     t.resident_name,
     t.balance
 FROM tenancies t
 JOIN units u ON u.unit_id = t.unit_id
+JOIN properties p ON p.property_id = u.property_id
 JOIN data_snapshots s ON s.snapshot_id = t.snapshot_id
 JOIN v_latest_rent_roll_snapshot latest
     ON latest.property_id = u.property_id AND latest.as_of_date = s.as_of_date

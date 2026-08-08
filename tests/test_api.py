@@ -89,3 +89,45 @@ def test_revenue_single_property_no_charges_returns_zeros_not_404(client):
 def test_revenue_unknown_property_still_404s(client):
     resp = client.get("/revenue/does-not-exist")
     assert resp.status_code == 404
+
+
+def test_leases_holdover_matches_stats_count(client):
+    """The copilot QA pass caught the model asserting 'no leases have expired' because
+    /leases/expiring only looks forward from the as-of date. /leases/holdover is the
+    other lens: occupied tenancies whose expiration is already past. Its count must
+    match the holdover_leases figure /stats has always reported (331), or the two
+    endpoints are silently defining 'holdover' differently."""
+    holdover = client.get("/leases/holdover").json()
+    stats = client.get("/stats").json()
+    assert holdover["holdover_count"] == stats["holdover_leases"] == 331
+    assert len(holdover["holdovers"]) == 331
+    # oldest first, and every row genuinely expired before the as-of date
+    dates = [h["lease_expiration"] for h in holdover["holdovers"]]
+    assert dates == sorted(dates)
+    assert all(d < holdover["reference_date"] for d in dates)
+
+
+def test_unit_lookup_resolves_by_number(client):
+    """The QA pass caught the model literally guessing internal unit_ids (1284-1286)
+    when it needed unit 328-104 -- whose real id turned out to be different. Lookup by
+    (property, unit number) removes the need to guess. 328-104 at The Mill Greenwich
+    is the specific unit that triggered this: the portfolio's largest delinquency."""
+    resp = client.get("/units/lookup", params={"property_id": "139", "unit_number": "328-104"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["canonical_name"] == "The Mill Greenwich"
+    assert body["tenancy"]["balance"] == 178806.41
+    assert body["charges"] == []  # the documented missing_charges partial gap at 139
+
+    missing = client.get("/units/lookup", params={"property_id": "139", "unit_number": "nope"})
+    assert missing.status_code == 404
+
+
+def test_delinquent_and_leases_carry_unit_id_and_name(client):
+    """unit_id and canonical_name were added to both views so the copilot can chain
+    into unit_detail without fishing, and so it stops inventing property names for
+    codes (it called 153 'Sutton Hill'; 153 is Abbot Mill)."""
+    delinquent = client.get("/delinquent?min_balance=100000").json()
+    assert delinquent[0]["unit_id"] and delinquent[0]["canonical_name"] == "The Mill Greenwich"
+    leases = client.get("/leases/expiring?days=14").json()["leases"]
+    assert all(row["unit_id"] and row["canonical_name"] for row in leases)

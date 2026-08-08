@@ -232,8 +232,8 @@ def leases_expiring(
         "SELECT MAX(as_of_date) FROM data_snapshots WHERE source_type = 'rent_roll'"
     ).fetchone()[0]
 
-    query = """SELECT tenancy_id, property_id, unit_number, resident_name,
-                      lease_expiration, market_rent
+    query = """SELECT tenancy_id, unit_id, property_id, canonical_name, unit_number,
+                      resident_name, lease_expiration, market_rent
                FROM v_lease_expirations
                WHERE lease_expiration BETWEEN ? AND date(?, '+' || ? || ' days')"""
     params = [cutoff, cutoff, days]
@@ -250,13 +250,44 @@ def leases_expiring(
     }
 
 
+@app.get("/leases/holdover")
+def leases_holdover(property_id: Optional[str] = None, conn=Depends(get_connection)):
+    """Occupied tenancies whose lease_expiration is already in the PAST relative to the
+    data's as-of date -- residents who stayed on after their lease term lapsed and the
+    field was never updated (331 portfolio-wide, some by over a decade; see CLAUDE.md
+    section 1). This is a different risk view from /leases/expiring, which only looks
+    forward: the copilot QA pass caught the model flatly asserting "no leases have
+    expired" because the forward-looking endpoint was the only lens it had."""
+    cutoff = conn.execute(
+        "SELECT MAX(as_of_date) FROM data_snapshots WHERE source_type = 'rent_roll'"
+    ).fetchone()[0]
+
+    query = """SELECT tenancy_id, unit_id, property_id, canonical_name, unit_number,
+                      resident_name, lease_expiration, market_rent
+               FROM v_lease_expirations
+               WHERE lease_expiration < ?"""
+    params = [cutoff]
+    if property_id:
+        query += " AND property_id = ?"
+        params.append(property_id)
+    query += " ORDER BY lease_expiration"
+
+    rows = conn.execute(query, params).fetchall()
+    return {
+        "reference_date": cutoff,
+        "holdover_count": len(rows),
+        "holdovers": [dict(r) for r in rows],
+    }
+
+
 @app.get("/delinquent")
 def delinquent_tenancies(
     min_balance: float = Query(0, description="Only balances strictly greater than this"),
     property_id: Optional[str] = None,
     conn=Depends(get_connection),
 ):
-    query = """SELECT tenancy_id, property_id, unit_number, resident_name, balance
+    query = """SELECT tenancy_id, unit_id, property_id, canonical_name, unit_number,
+                      resident_name, balance
                FROM v_delinquent_tenancies
                WHERE balance > ?"""
     params = [min_balance]
@@ -383,6 +414,36 @@ def property_units(property_id: str, conn=Depends(get_connection)):
     return [dict(r) for r in rows]
 
 
+@app.get("/units/lookup")
+def unit_lookup(
+    property_id: str,
+    unit_number: str,
+    conn=Depends(get_connection),
+):
+    """Resolve a unit by (property, unit number) straight to its full detail -- the
+    copilot QA pass caught the model literally GUESSING internal unit_ids after the
+    units list truncated before it reached the unit it wanted; a wrong guess would
+    have presented the wrong unit's data as the right one. Declared before
+    /units/{unit_id} (route registration order matters, same reasoning as
+    /revenue/concentration). If unit numbering collides across program types within
+    the property, all matches are returned so the caller picks by program."""
+    rows = conn.execute(
+        """SELECT unit_id FROM units
+           WHERE property_id = ? AND unit_number = ?
+           ORDER BY program_type""",
+        (property_id, unit_number),
+    ).fetchall()
+    if not rows:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No unit '{unit_number}' at property {property_id}",
+        )
+    details = [unit_detail(r["unit_id"], conn) for r in rows]
+    if len(details) == 1:
+        return details[0]
+    return {"multiple_matches": True, "matches": details}
+
+
 @app.get("/units/{unit_id}")
 def unit_detail(unit_id: int, conn=Depends(get_connection)):
     """Full detail for one unit: dimensions, its current-section tenancy from the
@@ -438,12 +499,14 @@ TOOL_DISPATCH = {
     "revenue_concentration": lambda args, conn: revenue_concentration(conn),
     "property_revenue": lambda args, conn: property_revenue(args["property_id"], conn),
     "leases_expiring": lambda args, conn: leases_expiring(args.get("days", 60), args.get("property_id"), conn),
+    "leases_holdover": lambda args, conn: leases_holdover(args.get("property_id"), conn),
     "delinquent_tenancies": lambda args, conn: delinquent_tenancies(args.get("min_balance", 0), args.get("property_id"), conn),
     "anomalies": lambda args, conn: anomalies(args.get("property_id"), conn),
     "occupancy_portfolio": lambda args, conn: occupancy_portfolio(conn),
     "occupancy_property": lambda args, conn: occupancy_property(args["property_id"], conn),
     "property_units": lambda args, conn: property_units(args["property_id"], conn),
     "unit_detail": lambda args, conn: unit_detail(int(args["unit_id"]), conn),
+    "unit_lookup": lambda args, conn: unit_lookup(args["property_id"], args["unit_number"], conn),
     "portfolio_stats": lambda args, conn: portfolio_stats(conn),
 }
 
