@@ -16,18 +16,21 @@ async function init() {
     api("/anomalies"),
   ]);
 
-  PORTFOLIO = { revenue, properties, occupancy, delinquent, leases: leases.leases, leaseRef: leases.reference_date, stats, anomalies };
+  const delinquentRows = delinquent.rows;
+  PORTFOLIO = { revenue, properties, occupancy, delinquent: delinquentRows,
+    delinquentTotal: delinquent.total_balance, leases: leases.leases,
+    leaseRef: leases.reference_date, stats, anomalies };
   const sortedByRevenue = [...revenue.by_property].sort((a, b) => b.net_effective_revenue - a.net_effective_revenue);
 
   renderSidebar(sortedByRevenue);
   renderHeader(properties, stats, anomalies, leases.reference_date);
   renderSignals(stats, anomalies);
-  renderPortfolioKpis(revenue, occupancy, delinquent, leases.leases, leases.reference_date);
+  renderPortfolioKpis(revenue, occupancy, delinquentRows, leases.leases, leases.reference_date);
   renderRevenueChart(sortedByRevenue);
   renderOccupancyChart(occupancy.by_property, sortedByRevenue);
   renderDonut(revenue.by_category);
   renderConcentration(concentration);
-  renderDelinquentList("delinquentList", delinquent);
+  renderDelinquentList("delinquentList", delinquentRows);
   renderLeaseList("leaseList", leases.leases);
 
   document.getElementById("asOfNote").textContent = `AS OF ${leases.reference_date || "—"}`;
@@ -159,8 +162,8 @@ async function showPropertyView(propertyId) {
   document.getElementById("pName").textContent = rev.canonical_name;
   document.getElementById("pId").textContent = propertyId;
 
-  renderPropertyKpis(rev, occ, delinquent, leases.leases);
-  renderUnitsTable(units);
+  renderPropertyKpis(rev, occ, delinquent.rows, leases.leases);
+  renderUnitsTable(units.units);
 
   window.scrollTo({ top: 0, behavior: "smooth" });
 }

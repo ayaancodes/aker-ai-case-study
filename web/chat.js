@@ -16,17 +16,20 @@ let sending = false;
 let skipActiveReveal = null; // set per turn while the typewriter is running
 
 /* reveal rate for the typewriter -- time-based (not per-frame) so a throttled or
-   backgrounded tab catches up in chunks instead of stalling. ~150 chars/sec reads
-   calm but not sluggish. Click the message to skip to the end. */
-const CHARS_PER_SEC = 150;
+   backgrounded tab catches up in chunks instead of stalling. ~75 chars/sec writes
+   visibly down the page. Click the message to skip to the end. */
+const CHARS_PER_SEC = 75;
 const TYPE_TICK_MS = 33;
 
 api("/leases/expiring?days=0").then((d) => {
   asOfNote.textContent = `AS OF ${d.reference_date}`;
 }).catch(() => {});
 
-function scrollToBottom() {
-  copilotMessages.scrollTop = copilotMessages.scrollHeight;
+function scrollToBottom(force) {
+  // only auto-stick when the user is already near the bottom -- if they scrolled up
+  // to read something, generation must not yank them back down
+  const nearBottom = copilotMessages.scrollHeight - copilotMessages.scrollTop - copilotMessages.clientHeight < 80;
+  if (force || nearBottom) copilotMessages.scrollTop = copilotMessages.scrollHeight;
 }
 
 /* escape first, THEN allow only **bold** through -- model text is untrusted input */
@@ -88,13 +91,14 @@ function barListHtml(items) {
   `).join("") + `</div>`;
 }
 
-function tableHtml(columns, rows, cap = 8) {
+function tableHtml(columns, rows, cap = 10, totalCount = null) {
   const shown = rows.slice(0, cap);
-  const more = rows.length - shown.length;
+  const total = totalCount ?? rows.length;
+  const more = total - shown.length;
   return `<div class="copilot-table-wrap"><table class="copilot-table">
     <thead><tr>${columns.map((c) => `<th>${c.label}</th>`).join("")}</tr></thead>
     <tbody>${shown.map((r, i) => `<tr class="row-in" style="animation-delay:${i * 45}ms">${columns.map((c) => `<td>${c.fmt ? c.fmt(r[c.key]) : (r[c.key] ?? "&mdash;")}</td>`).join("")}</tr>`).join("")}</tbody>
-  </table>${more > 0 ? `<div class="copilot-table-more">+ ${more} more &mdash; ask a narrower question to see them</div>` : ""}</div>`;
+  </table>${more > 0 ? `<div class="copilot-table-more">showing ${shown.length} of ${total} &middot; ask a narrower question for the rest</div>` : ""}</div>`;
 }
 
 function buildCardHtml(name, result) {
@@ -141,22 +145,22 @@ function buildCardHtml(name, result) {
           ["% Occ", result.pct_occ != null ? result.pct_occ.toFixed(1) + "%" : "&mdash;"],
         ]);
       case "delinquent_tenancies":
-        if (!result.length) return `<div class="copilot-empty">No outstanding balances.</div>`;
-        return tableHtml(
+        if (!result.rows.length) return `<div class="copilot-empty">No outstanding balances.</div>`;
+        return kpiRowHtml([["Owed total", fmtMoney(result.total_balance)], ["Tenancies", result.total_count]]) + tableHtml(
           [{ key: "resident_name", label: "Resident" }, { key: "canonical_name", label: "Property" }, { key: "unit_number", label: "Unit" }, { key: "balance", label: "Balance", fmt: fmtMoney }],
-          [...result].sort((a, b) => b.balance - a.balance)
+          result.rows, 10, result.total_count
         );
       case "leases_expiring":
         if (!result.leases.length) return `<div class="copilot-empty">Nothing expiring in this window.</div>`;
         return tableHtml(
           [{ key: "resident_name", label: "Resident" }, { key: "canonical_name", label: "Property" }, { key: "unit_number", label: "Unit" }, { key: "lease_expiration", label: "Expires" }, { key: "market_rent", label: "Rent", fmt: (v) => v ? fmtMoney(v) : "&mdash;" }],
-          result.leases
+          result.leases, 10, result.total_count
         );
       case "leases_holdover":
         if (!result.holdovers.length) return `<div class="copilot-empty">No holdover leases.</div>`;
         return kpiRowHtml([["Holdovers", result.holdover_count], ["As of", result.reference_date]]) + tableHtml(
           [{ key: "resident_name", label: "Resident" }, { key: "canonical_name", label: "Property" }, { key: "unit_number", label: "Unit" }, { key: "lease_expiration", label: "Expired" }, { key: "market_rent", label: "Rent", fmt: (v) => v ? fmtMoney(v) : "&mdash;" }],
-          result.holdovers
+          result.holdovers, 10, result.holdover_count
         );
       case "anomalies":
         if (!result.length) return `<div class="copilot-empty">No data quality flags.</div>`;
@@ -165,10 +169,10 @@ function buildCardHtml(name, result) {
           result, 6
         );
       case "property_units":
-        if (!result.length) return null;
+        if (!result.units.length) return null;
         return tableHtml(
           [{ key: "unit_number", label: "Unit" }, { key: "status", label: "Status" }, { key: "resident_name", label: "Resident", fmt: (v) => v || "&mdash;" }, { key: "market_rent", label: "Rent", fmt: (v) => v ? fmtMoney(v) : "&mdash;" }, { key: "balance", label: "Bal", fmt: (v) => v ? fmtMoney(v) : "&mdash;" }],
-          result
+          result.units, 10, result.total_count
         );
       case "unit_lookup":
         if (result.multiple_matches) return null;
@@ -187,6 +191,30 @@ function buildCardHtml(name, result) {
       }
       case "list_properties":
         return tableHtml([{ key: "property_id", label: "Code" }, { key: "canonical_name", label: "Property" }], result, 20);
+      case "rent_summary":
+        if (!result.length) return null;
+        return tableHtml(
+          [{ key: "canonical_name", label: "Property" }, { key: "avg_market_rent", label: "Avg Rent", fmt: (v) => v ? fmtMoney(v) : "&mdash;" }, { key: "revenue_per_sq_ft", label: "Rev/SqFt", fmt: (v) => v != null ? "$" + v.toFixed(2) : "&mdash;" }, { key: "net_effective_revenue", label: "Net Effective", fmt: fmtMoney }],
+          result, 15
+        );
+      case "delinquency_summary":
+        return kpiRowHtml([
+          ["Owed total", fmtMoney(result.portfolio_total_balance)],
+          ["Tenancies", result.portfolio_delinquent_count],
+        ]) + tableHtml(
+          [{ key: "canonical_name", label: "Property" }, { key: "delinquent_count", label: "Count" }, { key: "total_balance", label: "Total", fmt: fmtMoney }, { key: "max_balance", label: "Largest", fmt: fmtMoney }],
+          result.by_property, 15
+        );
+      case "query_database": {
+        // generic result table + the exact SQL as a collapsible receipt: this is the
+        // "how was this computed" surface, straight from the server response
+        const cols = result.columns.map((c, i) => ({ key: i, label: c }));
+        const rows = result.rows.map((r) => Object.fromEntries(r.map((v, i) => [i, typeof v === "number" && Math.abs(v) >= 1000 ? v.toLocaleString() : v])));
+        const table = rows.length
+          ? tableHtml(cols, rows, 10, result.row_count)
+          : `<div class="copilot-empty">Query returned no rows.</div>`;
+        return table + `<details class="copilot-sql"><summary>How this was computed</summary><pre>${escapeHtml(result.sql)}</pre></details>`;
+      }
       case "portfolio_stats":
         return kpiRowHtml([
           ["Properties", result.properties],
@@ -211,6 +239,8 @@ const CHIP_LABELS = {
   anomalies: "data quality flags", property_units: "unit list",
   unit_detail: "unit detail", unit_lookup: "unit detail",
   list_properties: "property list", portfolio_stats: "portfolio stats",
+  rent_summary: "rent aggregates", delinquency_summary: "delinquency rollup",
+  query_database: "query result",
 };
 
 /* card entrance: popin, then bars draw to width, one sheen sweep, and if the
@@ -238,6 +268,7 @@ async function sendMessage(forcedText) {
   copilotInput.value = "";
   if (copilotSuggest) copilotSuggest.remove();
   addMessage("user", text);
+  scrollToBottom(true);
   chatHistory.push({ role: "user", content: text });
 
   const thinkingRow = addThinkingRow();

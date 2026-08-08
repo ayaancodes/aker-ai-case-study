@@ -45,11 +45,23 @@ The interface renders your FIRST tool result as a real table or chart right afte
 answer; any additional datasets appear as chips the user can expand. So your job is NOT
 to restate the data. Write 1-3 short sentences: the direct answer plus one genuine
 insight or caveat. Never use markdown headers or bullet lists. You may bold at most one
-figure with **that** if it's the single number that matters. Do not enumerate a list of
-properties/units/residents in prose -- the table already shows them. If the question was
+figure with **that** if it's the single number that matters. If the question was
 genuinely ambiguous about scope (which property, which time window, which cut of the
 data), end with ONE short clarifying offer like "Want the full table?" or "Did you mean
 a specific property?" -- but only when actually ambiguous, never as a reflex.
+
+How to write (this is a product, not an essay):
+- Never use an em dash or en dash. Use a period and start a new sentence.
+- Short plain sentences. One idea per sentence.
+- Round dollar figures in prose ($7.56M, $144K). The card carries exact numbers.
+- Never enumerate rankings in prose ("X leads at A, followed by B at C, and D at E").
+  The table shows the ranking. Name at most the single top item if it matters.
+- If a tool result is partial (a capped list where total_count exceeds the rows shown,
+  or a property with the missing-charges gap), say so in your FIRST sentence, not as a
+  trailing note.
+- Do not do arithmetic in prose. If the number you want isn't in a tool result, get it
+  from rent_summary, delinquency_summary, or a query_database SELECT. Your query is
+  shown to the user as the receipt for how the number was computed.
 
 Rules:
 - Call a tool for every real number. Never estimate, round from memory, or recall a
@@ -70,7 +82,11 @@ Rules:
   delinquency), call a tool for each domain in the same turn -- never answer half of
   it from memory or from an earlier turn's results.
 - When no tool covers the question, say so in one plain sentence and name what you CAN
-  answer instead. Never pad a partial answer with filler to look complete.
+  answer instead. Never pad a partial answer with filler to look complete. Categories
+  this dataset can NEVER answer, refuse these outright: trends or changes over time
+  (one snapshot), geography or market location, unit or resident history, demographics
+  or anything about people beyond name, balance, and lease dates, and anything about
+  properties outside this portfolio.
 - Refer to properties by name AND code together on first mention, e.g. "Winners Circle
   (144)" -- the code is the real join key across the dataset, but nobody thinks in codes.
 - Known data quality gap, mention it when relevant: properties 175 (Kinwood Apartments),
@@ -204,6 +220,43 @@ TOOLS = [
         "description": "Portfolio-wide proof-of-rigor counts: number of properties, tenancies, charges, data quality flags, charge-total mismatches, holdover leases, loader errors.",
         "input_schema": {"type": "object", "properties": {}},
     },
+    {
+        "name": "rent_summary",
+        "description": "Per-property rent aggregates, precomputed: average market rent across occupied/notice tenancies, billable tenancy count, occupied square footage, net effective revenue, and revenue per square foot. Use this for 'average rent', 'rent per square foot', or per-property efficiency questions instead of computing from raw rows.",
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "delinquency_summary",
+        "description": "Delinquency rolled up per property (count, total balance, largest single balance) plus portfolio totals. Use this for 'how much is owed', 'which property has the worst delinquency' style questions instead of summing raw rows yourself.",
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "query_database",
+        "description": (
+            "Run ONE read-only SQL SELECT against the portfolio database when no other tool covers the "
+            "question. The exact query is shown to the user as the receipt for how the number was computed, "
+            "so keep it simple and readable. A LIMIT is enforced server-side. Schema: "
+            "properties(property_id, canonical_name); "
+            "units(unit_id, property_id, program_type, unit_number, unit_type, sq_ft); "
+            "tenancies(tenancy_id, unit_id, snapshot_id, section['current'|'future'], status['occupied'|'notice'|'vacant'|'model'|'down'], "
+            "resident_name, market_rent, resident_deposit, other_deposit, move_in, lease_expiration, move_out, balance); "
+            "charges(charge_id, tenancy_id, charge_code, amount); "
+            "charge_codes(code, category, description); "
+            "data_quality_flags(flag_id, property_id, flag_type, detail, pct_value); "
+            "unit_availability_snapshots(property_id, total_units, occupied_no_notice, vacant_rented, vacant_unrented, notice_rented, notice_unrented, avg_rent, avg_sq_ft). "
+            "Prefer these views, which already resolve latest-snapshot-per-property: "
+            "v_effective_revenue_by_property(property_id, gross_revenue, concessions, net_effective_revenue); "
+            "v_revenue_by_property_category(property_id, category, total_amount); "
+            "v_lease_expirations(tenancy_id, unit_id, property_id, canonical_name, unit_number, resident_name, lease_expiration, market_rent); "
+            "v_delinquent_tenancies(same columns plus balance). "
+            "If you query tenancies/charges directly you MUST scope to the latest snapshot via the views or you will double count."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {"sql": {"type": "string", "description": "A single SELECT statement"}},
+            "required": ["sql"],
+        },
+    },
 ]
 
 # Plain-English label shown in the frontend's "thinking" line while a tool call is in
@@ -227,6 +280,9 @@ _LABELS = {
     "property_units": lambda a: f"Pulling units for {a.get('property_id', '')}",
     "unit_detail": lambda a: f"Looking up unit {a.get('unit_id', '')}",
     "unit_lookup": lambda a: f"Looking up unit {a.get('unit_number', '')} at {a.get('property_id', '')}",
+    "rent_summary": lambda a: "Pulling rent aggregates by property",
+    "delinquency_summary": lambda a: "Pulling the delinquency rollup",
+    "query_database": lambda a: "Running a query",
     "portfolio_stats": lambda a: "Pulling portfolio stats",
 }
 

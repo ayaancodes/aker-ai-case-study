@@ -6,15 +6,18 @@ clean, predictable shape here matters more than for a typical CRUD API.
 Run: uvicorn api.main:app --reload
 """
 
+import re
+import sqlite3
 from pathlib import Path
 from typing import Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 from api.chat import ChatRequest, stream_chat
-from api.db import get_connection
+from api.db import DB_PATH, get_connection
 
 app = FastAPI(title="Aker Portfolio API")
 
@@ -226,6 +229,7 @@ def property_revenue(property_id: str, conn=Depends(get_connection)):
 def leases_expiring(
     days: int = Query(60, ge=0, description="Lookout window in days from the data's latest as-of date"),
     property_id: Optional[str] = None,
+    limit: Optional[int] = Query(None, ge=1, description="Cap the returned rows; total_count always reflects the full match"),
     conn=Depends(get_connection),
 ):
     cutoff = conn.execute(
@@ -243,15 +247,23 @@ def leases_expiring(
     query += " ORDER BY lease_expiration"
 
     rows = conn.execute(query, params).fetchall()
+    total = len(rows)
+    if limit is not None:
+        rows = rows[:limit]
     return {
         "reference_date": cutoff,
         "window_days": days,
+        "total_count": total,
         "leases": [dict(r) for r in rows],
     }
 
 
 @app.get("/leases/holdover")
-def leases_holdover(property_id: Optional[str] = None, conn=Depends(get_connection)):
+def leases_holdover(
+    property_id: Optional[str] = None,
+    limit: Optional[int] = Query(None, ge=1, description="Cap the returned rows; holdover_count always reflects the full match"),
+    conn=Depends(get_connection),
+):
     """Occupied tenancies whose lease_expiration is already in the PAST relative to the
     data's as-of date -- residents who stayed on after their lease term lapsed and the
     field was never updated (331 portfolio-wide, some by over a decade; see CLAUDE.md
@@ -273,9 +285,12 @@ def leases_holdover(property_id: Optional[str] = None, conn=Depends(get_connecti
     query += " ORDER BY lease_expiration"
 
     rows = conn.execute(query, params).fetchall()
+    total = len(rows)
+    if limit is not None:
+        rows = rows[:limit]
     return {
         "reference_date": cutoff,
-        "holdover_count": len(rows),
+        "holdover_count": total,
         "holdovers": [dict(r) for r in rows],
     }
 
@@ -284,6 +299,7 @@ def leases_holdover(property_id: Optional[str] = None, conn=Depends(get_connecti
 def delinquent_tenancies(
     min_balance: float = Query(0, description="Only balances strictly greater than this"),
     property_id: Optional[str] = None,
+    limit: Optional[int] = Query(None, ge=1, description="Cap the returned rows; total_count/total_balance always reflect the full match"),
     conn=Depends(get_connection),
 ):
     query = """SELECT tenancy_id, unit_id, property_id, canonical_name, unit_number,
@@ -297,7 +313,15 @@ def delinquent_tenancies(
     query += " ORDER BY balance DESC"
 
     rows = conn.execute(query, params).fetchall()
-    return [dict(r) for r in rows]
+    total = len(rows)
+    total_balance = sum(r["balance"] for r in rows)
+    if limit is not None:
+        rows = rows[:limit]
+    return {
+        "total_count": total,
+        "total_balance": total_balance,
+        "rows": [dict(r) for r in rows],
+    }
 
 
 @app.get("/anomalies")
@@ -384,11 +408,16 @@ def occupancy_property(property_id: str, conn=Depends(get_connection)):
 
 
 @app.get("/properties/{property_id}/units")
-def property_units(property_id: str, conn=Depends(get_connection)):
+def property_units(
+    property_id: str,
+    limit: Optional[int] = Query(None, ge=1, description="Cap the returned rows; total_count always reflects the full unit count"),
+    conn=Depends(get_connection),
+):
     """Unit-level drill-down for a property -- the second layer under the property view.
     Joins each unit to its current-section tenancy from that unit's program's latest
     rent-roll snapshot, so vacant units show with no tenancy fields rather than being
-    dropped."""
+    dropped. No default limit: the dashboard filters/searches the full list client
+    side; the chatbot's tool dispatch passes an explicit limit instead."""
     prop = conn.execute(
         "SELECT canonical_name FROM properties WHERE property_id = ?", (property_id,)
     ).fetchone()
@@ -411,7 +440,117 @@ def property_units(property_id: str, conn=Depends(get_connection)):
            ORDER BY u.unit_number""",
         (property_id,),
     ).fetchall()
-    return [dict(r) for r in rows]
+    total = len(rows)
+    if limit is not None:
+        rows = rows[:limit]
+    return {"total_count": total, "units": [dict(r) for r in rows]}
+
+
+@app.get("/metrics/rent-summary")
+def rent_summary(conn=Depends(get_connection)):
+    """Per-property rent aggregates so the chatbot cites tool outputs instead of doing
+    its own arithmetic in prose: average market rent across occupied/notice tenancies,
+    and net effective revenue per occupied square foot. Latest snapshot per property,
+    same resolution rule as every revenue view."""
+    rows = conn.execute(
+        """SELECT u.property_id, p.canonical_name,
+                  ROUND(AVG(t.market_rent), 0) AS avg_market_rent,
+                  COUNT(*) AS billable_tenancies,
+                  ROUND(SUM(u.sq_ft), 0) AS occupied_sq_ft
+           FROM tenancies t
+           JOIN units u ON u.unit_id = t.unit_id
+           JOIN properties p ON p.property_id = u.property_id
+           JOIN data_snapshots s ON s.snapshot_id = t.snapshot_id
+           JOIN v_latest_rent_roll_snapshot latest
+               ON latest.property_id = u.property_id AND latest.as_of_date = s.as_of_date
+           WHERE t.section = 'current' AND t.status IN ('occupied', 'notice')
+             AND t.market_rent > 0
+           GROUP BY u.property_id
+           ORDER BY avg_market_rent DESC""",
+    ).fetchall()
+    revenue = {
+        r["property_id"]: r["net_effective_revenue"]
+        for r in conn.execute("SELECT property_id, net_effective_revenue FROM v_effective_revenue_by_property")
+    }
+    out = []
+    for r in rows:
+        d = dict(r)
+        net = revenue.get(d["property_id"], 0)
+        d["net_effective_revenue"] = net
+        d["revenue_per_sq_ft"] = round(net / d["occupied_sq_ft"], 2) if d["occupied_sq_ft"] else None
+        out.append(d)
+    return out
+
+
+@app.get("/metrics/delinquency-summary")
+def delinquency_summary(conn=Depends(get_connection)):
+    """Delinquency rolled up per property (count, total, largest single balance) plus
+    a portfolio rollup -- the aggregate answer to 'who owes the most' style questions,
+    so the model never sums raw rows itself."""
+    rows = conn.execute(
+        """SELECT property_id, canonical_name,
+                  COUNT(*) AS delinquent_count,
+                  ROUND(SUM(balance), 2) AS total_balance,
+                  ROUND(MAX(balance), 2) AS max_balance
+           FROM v_delinquent_tenancies
+           GROUP BY property_id
+           ORDER BY total_balance DESC""",
+    ).fetchall()
+    by_property = [dict(r) for r in rows]
+    return {
+        "portfolio_delinquent_count": sum(r["delinquent_count"] for r in by_property),
+        "portfolio_total_balance": round(sum(r["total_balance"] for r in by_property), 2),
+        "by_property": by_property,
+    }
+
+
+# ── guarded read-only SQL for the copilot ────────────────────────────────────────
+# The model can run a SELECT when no endpoint covers the question, instead of doing
+# arithmetic in prose. Guardrails, in depth order: the connection is opened read-only
+# at the SQLite level (mode=ro -- writes fail in the engine, not in our regex), the
+# statement must be a single SELECT, a keyword denylist rejects anything that isn't
+# plain querying, and a LIMIT is appended when missing. The executed SQL is returned
+# so the frontend can show exactly how a number was computed.
+
+_SQL_DENY = re.compile(
+    r"\b(insert|update|delete|drop|alter|create|replace|pragma|attach|detach|vacuum|reindex)\b",
+    re.IGNORECASE,
+)
+_QUERY_ROW_CAP = 200
+
+
+class SqlRequest(BaseModel):
+    sql: str
+
+
+@app.post("/query")
+def run_query(payload: SqlRequest):
+    sql = payload.sql.strip().rstrip(";").strip()
+    if ";" in sql:
+        raise HTTPException(status_code=400, detail="One statement only.")
+    if not re.match(r"^select\b", sql, re.IGNORECASE):
+        raise HTTPException(status_code=400, detail="SELECT statements only.")
+    if _SQL_DENY.search(sql):
+        raise HTTPException(status_code=400, detail="Query contains a disallowed keyword.")
+    if not re.search(r"\blimit\s+\d+\b", sql, re.IGNORECASE):
+        sql = f"{sql} LIMIT {_QUERY_ROW_CAP}"
+
+    conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    try:
+        cur = conn.execute(sql)
+        rows = cur.fetchmany(_QUERY_ROW_CAP)
+        columns = [c[0] for c in cur.description] if cur.description else []
+        return {
+            "sql": sql,
+            "columns": columns,
+            "rows": [list(r) for r in rows],
+            "row_count": len(rows),
+        }
+    except sqlite3.Error as e:
+        raise HTTPException(status_code=400, detail=f"SQL error: {e}")
+    finally:
+        conn.close()
 
 
 @app.get("/units/lookup")
@@ -492,22 +631,30 @@ def unit_detail(unit_id: int, conn=Depends(get_connection)):
     }
 
 
+# Chat tool calls always carry an explicit row cap (default 50) -- the dashboard
+# fetches these endpoints uncapped for client-side filtering/aggregation, but the
+# model never needs more than the top of an ordered list plus the honest total_count.
+CHAT_LIST_LIMIT = 50
+
 TOOL_DISPATCH = {
     "list_properties": lambda args, conn: list_properties(conn),
     "get_property": lambda args, conn: get_property(args["property_id"], conn),
     "portfolio_revenue": lambda args, conn: portfolio_revenue(conn),
     "revenue_concentration": lambda args, conn: revenue_concentration(conn),
     "property_revenue": lambda args, conn: property_revenue(args["property_id"], conn),
-    "leases_expiring": lambda args, conn: leases_expiring(args.get("days", 60), args.get("property_id"), conn),
-    "leases_holdover": lambda args, conn: leases_holdover(args.get("property_id"), conn),
-    "delinquent_tenancies": lambda args, conn: delinquent_tenancies(args.get("min_balance", 0), args.get("property_id"), conn),
+    "leases_expiring": lambda args, conn: leases_expiring(args.get("days", 60), args.get("property_id"), min(int(args.get("limit", CHAT_LIST_LIMIT)), CHAT_LIST_LIMIT), conn),
+    "leases_holdover": lambda args, conn: leases_holdover(args.get("property_id"), min(int(args.get("limit", CHAT_LIST_LIMIT)), CHAT_LIST_LIMIT), conn),
+    "delinquent_tenancies": lambda args, conn: delinquent_tenancies(args.get("min_balance", 0), args.get("property_id"), min(int(args.get("limit", CHAT_LIST_LIMIT)), CHAT_LIST_LIMIT), conn),
     "anomalies": lambda args, conn: anomalies(args.get("property_id"), conn),
     "occupancy_portfolio": lambda args, conn: occupancy_portfolio(conn),
     "occupancy_property": lambda args, conn: occupancy_property(args["property_id"], conn),
-    "property_units": lambda args, conn: property_units(args["property_id"], conn),
+    "property_units": lambda args, conn: property_units(args["property_id"], min(int(args.get("limit", CHAT_LIST_LIMIT)), CHAT_LIST_LIMIT), conn),
     "unit_detail": lambda args, conn: unit_detail(int(args["unit_id"]), conn),
     "unit_lookup": lambda args, conn: unit_lookup(args["property_id"], args["unit_number"], conn),
     "portfolio_stats": lambda args, conn: portfolio_stats(conn),
+    "rent_summary": lambda args, conn: rent_summary(conn),
+    "delinquency_summary": lambda args, conn: delinquency_summary(conn),
+    "query_database": lambda args, conn: run_query(SqlRequest(sql=args["sql"])),
 }
 
 
