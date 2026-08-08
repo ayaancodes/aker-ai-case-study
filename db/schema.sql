@@ -132,29 +132,47 @@ CREATE INDEX idx_ua_snapshots_property ON unit_availability_snapshots(property_i
 
 -- ---------------------------------------------------------------------------
 -- Views for hot-path aggregates (revenue by category, revenue by property, occupancy)
+--
+-- All four views below resolve to "latest rent_roll snapshot per property" via the
+-- v_latest_rent_roll_snapshot helper view, not "every snapshot ever loaded". With a
+-- single month of data this makes no visible difference, but it matters the moment a
+-- second month loads: without this, a property with two snapshots would get its
+-- revenue/leases/balances summed or listed across both periods instead of showing
+-- just the current one. Caught and fixed while sanity-checking the views before
+-- building the API on top of them, better to fix once here than debug it later once
+-- the dashboard and chatbot both depend on these views.
 -- ---------------------------------------------------------------------------
 
--- Revenue by property and charge category, for a given snapshot.
+CREATE VIEW v_latest_rent_roll_snapshot AS
+SELECT property_id, MAX(as_of_date) AS as_of_date
+FROM data_snapshots
+WHERE source_type = 'rent_roll'
+GROUP BY property_id;
+
+-- Revenue by property and charge category, latest period only.
 -- concession-category amounts are stored as negatives in the source data (rent/parking/etc
 -- concessions), so they net out naturally when summed alongside the category they offset.
 CREATE VIEW v_revenue_by_property_category AS
 SELECT
-    t.snapshot_id,
     u.property_id,
+    latest.as_of_date,
     cc.category,
     SUM(c.amount) AS total_amount
 FROM charges c
 JOIN charge_codes cc ON cc.code = c.charge_code
 JOIN tenancies t ON t.tenancy_id = c.tenancy_id
 JOIN units u ON u.unit_id = t.unit_id
-GROUP BY t.snapshot_id, u.property_id, cc.category;
+JOIN data_snapshots s ON s.snapshot_id = t.snapshot_id
+JOIN v_latest_rent_roll_snapshot latest
+    ON latest.property_id = u.property_id AND latest.as_of_date = s.as_of_date
+GROUP BY u.property_id, cc.category;
 
--- Gross revenue vs concessions vs net effective revenue, by property/snapshot.
+-- Gross revenue vs concessions vs net effective revenue, by property, latest period only.
 -- Standard real estate framing: net effective rent = gross revenue - concessions.
 CREATE VIEW v_effective_revenue_by_property AS
 SELECT
-    t.snapshot_id,
     u.property_id,
+    latest.as_of_date,
     SUM(CASE WHEN cc.category != 'concession' THEN c.amount ELSE 0 END) AS gross_revenue,
     SUM(CASE WHEN cc.category = 'concession' THEN c.amount ELSE 0 END) AS concessions,
     SUM(c.amount) AS net_effective_revenue
@@ -162,9 +180,13 @@ FROM charges c
 JOIN charge_codes cc ON cc.code = c.charge_code
 JOIN tenancies t ON t.tenancy_id = c.tenancy_id
 JOIN units u ON u.unit_id = t.unit_id
-GROUP BY t.snapshot_id, u.property_id;
+JOIN data_snapshots s ON s.snapshot_id = t.snapshot_id
+JOIN v_latest_rent_roll_snapshot latest
+    ON latest.property_id = u.property_id AND latest.as_of_date = s.as_of_date
+GROUP BY u.property_id;
 
--- Leases expiring soon (current, occupied tenancies with a lease_expiration date).
+-- Leases expiring soon (current, occupied tenancies with a lease_expiration date),
+-- latest period only.
 CREATE VIEW v_lease_expirations AS
 SELECT
     t.tenancy_id,
@@ -175,11 +197,14 @@ SELECT
     t.market_rent
 FROM tenancies t
 JOIN units u ON u.unit_id = t.unit_id
+JOIN data_snapshots s ON s.snapshot_id = t.snapshot_id
+JOIN v_latest_rent_roll_snapshot latest
+    ON latest.property_id = u.property_id AND latest.as_of_date = s.as_of_date
 WHERE t.section = 'current'
   AND t.status = 'occupied'
   AND t.lease_expiration IS NOT NULL;
 
--- Delinquent tenancies (positive balance owed).
+-- Delinquent tenancies (positive balance owed), latest period only.
 CREATE VIEW v_delinquent_tenancies AS
 SELECT
     t.tenancy_id,
@@ -189,4 +214,7 @@ SELECT
     t.balance
 FROM tenancies t
 JOIN units u ON u.unit_id = t.unit_id
+JOIN data_snapshots s ON s.snapshot_id = t.snapshot_id
+JOIN v_latest_rent_roll_snapshot latest
+    ON latest.property_id = u.property_id AND latest.as_of_date = s.as_of_date
 WHERE t.balance > 0;
