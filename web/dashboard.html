@@ -44,15 +44,15 @@
       <div class="dash-section dash-grid-2">
         <div class="eq-panel">
           <div class="eq-head">
-            <div><div class="eq-title">Net effective revenue by property</div></div>
+            <div><div class="eq-title">Net effective revenue by property</div><div class="eq-sub">scroll for all 15</div></div>
           </div>
-          <div class="eq-body"><canvas id="revenueChart"></canvas><div class="eq-tip" id="revenueTip"></div></div>
+          <div class="eq-body scrolly"><canvas id="revenueChart"></canvas><div class="eq-tip" id="revenueTip"></div></div>
         </div>
         <div class="eq-panel">
           <div class="eq-head">
-            <div><div class="eq-title">Occupancy by property</div></div>
+            <div><div class="eq-title">Occupancy by property</div><div class="eq-sub">scroll for all 15</div></div>
           </div>
-          <div class="eq-body"><canvas id="occupancyChart"></canvas><div class="eq-tip" id="occupancyTip"></div></div>
+          <div class="eq-body scrolly"><canvas id="occupancyChart"></canvas><div class="eq-tip" id="occupancyTip"></div></div>
         </div>
       </div>
 
@@ -97,11 +97,13 @@
         <span id="pId"></span>
       </div>
 
-      <div class="dash-section">
+      <!-- revenue waterfall + both risk panels in one row: no scrolling needed to see
+           the property's whole financial picture -->
+      <div class="dash-section prop-grid-3">
         <div class="eq-panel">
           <div class="eq-head"><div><div class="eq-title">Revenue</div></div></div>
           <div class="eq-body">
-            <div class="waterfall">
+            <div class="waterfall waterfall-compact">
               <div class="wf-col">
                 <div class="wf-val mono" id="wfGrossVal"></div>
                 <div class="wf-bar gross" id="wfGross" style="height:0"></div>
@@ -120,23 +122,25 @@
             </div>
           </div>
         </div>
-      </div>
-
-      <div class="dash-section risk-grid">
         <div class="eq-panel">
           <div class="eq-head"><div><div class="eq-title">Delinquent balances</div></div></div>
-          <div class="risk-list" id="pDelinquentList"></div>
+          <div class="risk-list risk-list-compact" id="pDelinquentList"></div>
         </div>
         <div class="eq-panel">
-          <div class="eq-head"><div><div class="eq-title">Lease rollover</div></div></div>
-          <div class="risk-list" id="pLeaseList"></div>
+          <div class="eq-head"><div><div class="eq-title">Lease rollover</div><div class="eq-sub">60 days</div></div></div>
+          <div class="risk-list risk-list-compact" id="pLeaseList"></div>
         </div>
       </div>
 
       <div class="dash-section">
         <div class="eq-panel">
-          <div class="eq-head">
+          <div class="eq-head units-head">
             <div><div class="eq-title">Units</div><div class="eq-sub" id="unitsCount"></div></div>
+            <div class="units-tools">
+              <input type="text" id="unitSearch" placeholder="Find unit or resident&hellip;" autocomplete="off">
+              <select id="unitStatusFilter"><option value="">All statuses</option></select>
+              <select id="unitTypeFilter"><option value="">All types</option></select>
+            </div>
           </div>
           <div class="units-table-wrap">
             <table class="units-table">

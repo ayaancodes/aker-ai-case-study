@@ -14,11 +14,11 @@ async function init() {
     api("/leases/expiring?days=60"),
   ]);
 
-  PORTFOLIO = { revenue, properties, occupancy, delinquent, leases: leases.leases };
+  PORTFOLIO = { revenue, properties, occupancy, delinquent, leases: leases.leases, leaseRef: leases.reference_date };
   const sortedByRevenue = [...revenue.by_property].sort((a, b) => b.net_effective_revenue - a.net_effective_revenue);
 
   renderSidebar(sortedByRevenue);
-  renderPortfolioKpis(revenue, occupancy, delinquent, leases.leases);
+  renderPortfolioKpis(revenue, occupancy, delinquent, leases.leases, leases.reference_date);
   renderRevenueChart(sortedByRevenue);
   renderOccupancyChart(occupancy.by_property, sortedByRevenue);
   renderDonut(revenue.by_category);
@@ -72,7 +72,7 @@ function showPortfolioView() {
   document.getElementById("dashPortfolioView").style.display = "";
   document.getElementById("dashPropertyView").style.display = "none";
   renderSidebar(sortedPortfolio(), document.getElementById("dashSearch").value);
-  renderPortfolioKpis(PORTFOLIO.revenue, PORTFOLIO.occupancy, PORTFOLIO.delinquent, PORTFOLIO.leases);
+  renderPortfolioKpis(PORTFOLIO.revenue, PORTFOLIO.occupancy, PORTFOLIO.delinquent, PORTFOLIO.leases, PORTFOLIO.leaseRef);
 }
 
 async function showPropertyView(propertyId) {
@@ -114,28 +114,117 @@ async function showPropertyView(propertyId) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function kpiTile(value, label) {
-  return `<div class="kpi-tile"><div class="kv">${value}</div><div class="kk">${label}</div></div>`;
+/* ── KPI tiles with a small real-data visual under each number. No trend lines on
+   purpose -- one snapshot loaded, so every mini-viz shows composition, not time. ── */
+function kpiTile(value, label, vizId, legend) {
+  const viz = vizId ? `<canvas id="${vizId}"></canvas>` : "";
+  const leg = legend ? `<div class="kpi-legend">${legend}</div>` : "";
+  return `<div class="kpi-tile"><div class="kv">${value}</div><div class="kk">${label}</div>${viz}${leg}</div>`;
 }
 
-function renderPortfolioKpis(revenue, occupancy, delinquent, leases) {
+/* segmented horizontal bar: segments = [{value, color}] */
+function drawKpiSegments(id, segments) {
+  const cv = document.getElementById(id);
+  if (!cv) return;
+  const { ctx, w, h } = fitCanvas(cv);
+  ctx.clearRect(0, 0, w, h);
+  const total = segments.reduce((s, x) => s + x.value, 0) || 1;
+  const barY = h / 2 - 4, barH = 8;
+  let x = 0;
+  segments.forEach((seg, i) => {
+    const segW = (seg.value / total) * w;
+    ctx.fillStyle = seg.color;
+    ctx.beginPath();
+    ctx.roundRect(x, barY, Math.max(segW - (i < segments.length - 1 ? 2 : 0), 0), barH, 3);
+    ctx.fill();
+    x += segW;
+  });
+}
+
+/* progress track for a single percentage */
+function drawKpiProgress(id, pct) {
+  const cv = document.getElementById(id);
+  if (!cv) return;
+  const { ctx, w, h } = fitCanvas(cv);
+  ctx.clearRect(0, 0, w, h);
+  const barY = h / 2 - 4, barH = 8;
+  ctx.fillStyle = "rgba(148,163,184,.14)";
+  ctx.beginPath(); ctx.roundRect(0, barY, w, barH, 99); ctx.fill();
+  const grad = ctx.createLinearGradient(0, 0, w * pct / 100, 0);
+  grad.addColorStop(0, "#6fd2ff"); grad.addColorStop(1, "#3fa9e8");
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.roundRect(0, barY, Math.max(w * pct / 100, 4), barH, 99); ctx.fill();
+}
+
+const SEG_PALETTE = ["#6fd2ff", "#3fa9e8", "#94a3b8", "#a78bfa", "#f0b429", "#5e6673"];
+
+function topSegments(rows, getValue, topN = 5) {
+  const sorted = [...rows].sort((a, b) => getValue(b) - getValue(a));
+  const top = sorted.slice(0, topN).filter((r) => getValue(r) > 0);
+  const rest = sorted.slice(topN).reduce((s, r) => s + Math.max(getValue(r), 0), 0);
+  const segs = top.map((r, i) => ({ value: getValue(r), color: SEG_PALETTE[i % SEG_PALETTE.length] }));
+  if (rest > 0) segs.push({ value: rest, color: "rgba(148,163,184,.25)" });
+  return segs;
+}
+
+function renderPortfolioKpis(revenue, occupancy, delinquent, leases, leaseRefDate) {
   const totalDelinquent = delinquent.reduce((s, r) => s + r.balance, 0);
+  // split the 60-day rollover window at ref+30d, computed from the API's own
+  // reference_date rather than hardcoded
+  const d = new Date(leaseRefDate + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + 30);
+  const cutoff30 = d.toISOString().slice(0, 10);
+  const within30 = leases.filter((l) => l.lease_expiration <= cutoff30).length;
+
   document.getElementById("dashKpiStrip").innerHTML =
-    kpiTile(fmtMoney(revenue.total_net_effective_revenue), "Net effective revenue") +
-    kpiTile(fmtMoney(revenue.total_gross_revenue), "Gross revenue") +
-    kpiTile(occupancy.pct_occ != null ? occupancy.pct_occ.toFixed(1) + "%" : "—", "Occupancy") +
-    kpiTile(fmtMoney(totalDelinquent), "Total delinquent") +
-    kpiTile(leases.length, "Leases rolling over (60d)");
+    kpiTile(fmtMoney(revenue.total_net_effective_revenue), "Net effective revenue",
+      "kpiNetViz", "TOP 5 PROPERTIES + REST") +
+    kpiTile(fmtMoney(revenue.total_gross_revenue), "Gross revenue",
+      "kpiGrossViz", "GROSS VS CONCESSIONS") +
+    kpiTile(occupancy.pct_occ != null ? occupancy.pct_occ.toFixed(1) + "%" : "—", "Occupancy",
+      "kpiOccViz", `${occupancy.total_occupied} OF ${occupancy.total_units} UNITS`) +
+    kpiTile(fmtMoney(totalDelinquent), "Total delinquent",
+      "kpiDelViz", "TOP 5 BALANCES + REST") +
+    kpiTile(leases.length, "Leases rolling over (60d)",
+      "kpiRollViz", `${within30} WITHIN 30D · ${leases.length - within30} IN 31-60D`);
+
+  drawKpiSegments("kpiNetViz", topSegments(revenue.by_property, (p) => p.net_effective_revenue));
+  drawKpiSegments("kpiGrossViz", [
+    { value: revenue.total_gross_revenue, color: "#6fd2ff" },
+    { value: Math.abs(revenue.total_concessions), color: "#f87171" },
+  ]);
+  if (occupancy.pct_occ != null) drawKpiProgress("kpiOccViz", occupancy.pct_occ);
+  drawKpiSegments("kpiDelViz", topSegments(delinquent, (r) => r.balance).map((s) => ({ ...s, color: s.color === "rgba(148,163,184,.25)" ? s.color : "#f87171" })));
+  drawKpiSegments("kpiRollViz", [
+    { value: within30 || 0.0001, color: "#f0b429" },
+    { value: (leases.length - within30) || 0.0001, color: "rgba(240,180,41,.3)" },
+  ]);
 }
 
 function renderPropertyKpis(rev, occ, delinquent, leases) {
   const totalDelinquent = delinquent.reduce((s, r) => s + r.balance, 0);
   document.getElementById("dashKpiStrip").innerHTML =
-    kpiTile(fmtMoney(rev.net_effective_revenue), "Net effective revenue") +
-    kpiTile(occ.pct_occ != null ? occ.pct_occ.toFixed(1) + "%" : "—", "Occupancy") +
-    kpiTile(occ.total_units, "Units") +
-    kpiTile(fmtMoney(totalDelinquent), "Delinquent") +
+    kpiTile(fmtMoney(rev.net_effective_revenue), "Net effective revenue",
+      "kpiPNetViz", "NET VS CONCESSIONS") +
+    kpiTile(occ.pct_occ != null ? occ.pct_occ.toFixed(1) + "%" : "—", "Occupancy",
+      "kpiPOccViz", `${occ.occupied} OF ${occ.total_units} UNITS`) +
+    kpiTile(occ.total_units, "Units",
+      "kpiPUnitsViz", `${occ.occupied} OCC · ${occ.on_notice} NOTICE · ${occ.vacant} VACANT`) +
+    kpiTile(fmtMoney(totalDelinquent), "Delinquent",
+      "kpiPDelViz", "TOP 5 BALANCES + REST") +
     kpiTile(leases.length, "Rolling over (60d)");
+
+  drawKpiSegments("kpiPNetViz", [
+    { value: rev.net_effective_revenue || 0.0001, color: "#34d399" },
+    { value: Math.abs(rev.concessions), color: "#f87171" },
+  ]);
+  if (occ.pct_occ != null) drawKpiProgress("kpiPOccViz", occ.pct_occ);
+  drawKpiSegments("kpiPUnitsViz", [
+    { value: occ.occupied || 0.0001, color: "#34d399" },
+    { value: occ.on_notice, color: "#f0b429" },
+    { value: occ.vacant, color: "#f87171" },
+  ].filter((s) => s.value > 0));
+  drawKpiSegments("kpiPDelViz", topSegments(delinquent, (r) => r.balance).map((s) => ({ ...s, color: s.color === "rgba(148,163,184,.25)" ? s.color : "#f87171" })));
 }
 
 function renderRevenueChart(sorted) {
@@ -165,9 +254,45 @@ function renderConcentration(rows) {
   renderDonutLegend(document.getElementById("concLegend"), rows, "program_type");
 }
 
+/* ── units table with lookup + filters. All filtering is client-side over the units
+   already fetched for the selected property -- no refetch per keystroke. ── */
+let PROPERTY_UNITS = [];
+
 function renderUnitsTable(units) {
-  document.getElementById("unitsCount").textContent = `${units.length} units`;
-  document.getElementById("unitsBody").innerHTML = units.map((u) => {
+  PROPERTY_UNITS = units;
+
+  const statuses = [...new Set(units.map((u) => u.status || "vacant"))].sort();
+  const types = [...new Set(units.map((u) => u.unit_type).filter(Boolean))].sort();
+  document.getElementById("unitStatusFilter").innerHTML =
+    `<option value="">All statuses</option>` + statuses.map((s) => `<option value="${s}">${s}</option>`).join("");
+  document.getElementById("unitTypeFilter").innerHTML =
+    `<option value="">All types</option>` + types.map((t) => `<option value="${t}">${t}</option>`).join("");
+  document.getElementById("unitSearch").value = "";
+
+  applyUnitFilters();
+}
+
+function applyUnitFilters() {
+  const q = document.getElementById("unitSearch").value.trim().toLowerCase();
+  const status = document.getElementById("unitStatusFilter").value;
+  const type = document.getElementById("unitTypeFilter").value;
+
+  const filtered = PROPERTY_UNITS.filter((u) => {
+    if (status && (u.status || "vacant") !== status) return false;
+    if (type && u.unit_type !== type) return false;
+    if (q && !(
+      u.unit_number.toLowerCase().includes(q) ||
+      (u.resident_name || "").toLowerCase().includes(q)
+    )) return false;
+    return true;
+  });
+
+  document.getElementById("unitsCount").textContent =
+    filtered.length === PROPERTY_UNITS.length
+      ? `${PROPERTY_UNITS.length} units`
+      : `${filtered.length} of ${PROPERTY_UNITS.length} units`;
+
+  document.getElementById("unitsBody").innerHTML = filtered.map((u) => {
     const status = u.status || "vacant";
     return `<tr>
       <td class="strong">${u.unit_number}</td>
@@ -181,6 +306,10 @@ function renderUnitsTable(units) {
     </tr>`;
   }).join("");
 }
+
+document.getElementById("unitSearch").addEventListener("input", applyUnitFilters);
+document.getElementById("unitStatusFilter").addEventListener("change", applyUnitFilters);
+document.getElementById("unitTypeFilter").addEventListener("change", applyUnitFilters);
 
 init().catch((err) => {
   console.error(err);

@@ -1,3 +1,7 @@
+/* Landing page: a personalized greeting, the live portfolio pulse line, the ticker,
+   and the sign-in modal. All analytics live in dashboard.html -- the landing stays
+   deliberately small. */
+
 /* ── perspective particle field, adapted from Vega's hero background (2D canvas
    version, permission granted to reuse/adapt) -- purely atmospheric motion, the
    only visual in the hero besides the headline itself. ── */
@@ -45,33 +49,25 @@ function particleField(cv) {
 }
 
 async function init() {
-  const [revenue, properties, delinquent, leases] = await Promise.all([
+  particleField(document.getElementById("heroField"));
+
+  const [revenue, occupancy] = await Promise.all([
     api("/revenue/portfolio"),
-    api("/properties"),
-    api("/delinquent"),
-    api("/leases/expiring?days=60"),
+    api("/occupancy/portfolio"),
   ]);
 
-  const sortedByRevenue = [...revenue.by_property].sort((a, b) => b.net_effective_revenue - a.net_effective_revenue);
+  const sorted = [...revenue.by_property].sort((a, b) => b.net_effective_revenue - a.net_effective_revenue);
 
-  renderTicker(sortedByRevenue);
-  particleField(document.getElementById("heroField"));
-  initExplorer(properties, sortedByRevenue);
-  renderRevenueChart(revenue, sortedByRevenue);
-  renderDonut(revenue.by_category);
-  renderMarquee(sortedByRevenue);
-  renderDelinquentList("delinquentList", delinquent);
-  renderLeaseList("leaseList", leases.leases);
+  // the one-line live pulse under the greeting -- real numbers, same API the dashboard uses
+  document.getElementById("portfolioPulse").textContent =
+    `${revenue.by_property.length} PROPERTIES · ${fmtMoney(revenue.total_net_effective_revenue)} NET EFFECTIVE · ` +
+    `${occupancy.pct_occ != null ? occupancy.pct_occ.toFixed(1) + "%" : "—"} OCCUPIED`;
 
-  const first = await api(`/properties/${sortedByRevenue[0].property_id}`);
-  const asOfDate = first?.latest_as_of_date?.rent_roll;
-  document.getElementById("asOfNote").textContent = `AS OF ${asOfDate || "—"} · 15 PROPERTIES`;
+  renderTicker(sorted);
 
-  observeReveals();
-  window.addEventListener("resize", () => {
-    drawRevenueChart(document.getElementById("revenueChart"), document.getElementById("revenueTip"), sortedByRevenue, 1);
-    drawDonut(document.getElementById("donutChart"), revenue.by_category, 1);
-  });
+  const first = await api(`/properties/${sorted[0].property_id}`);
+  document.getElementById("asOfNote").textContent =
+    `AS OF ${first?.latest_as_of_date?.rent_roll || "—"}`;
 }
 
 function renderTicker(sorted) {
@@ -85,106 +81,6 @@ function renderTicker(sorted) {
       <span class="px mono">${fmtMoney(p.net_effective_revenue)}</span>
     </span>`;
   }).join("");
-}
-
-function renderRevenueChart(revenue, sorted) {
-  const cv = document.getElementById("revenueChart");
-  const tip = document.getElementById("revenueTip");
-  animateOnceVisible(cv, (progress) => drawRevenueChart(cv, tip, sorted, progress));
-  document.getElementById("revenueFoot").innerHTML = `
-    <span>gross <b>${fmtMoney(revenue.total_gross_revenue)}</b></span>
-    <span>concessions <b>${fmtMoneySigned(revenue.total_concessions)}</b></span>
-    <span>net effective <b>${fmtMoney(revenue.total_net_effective_revenue)}</b></span>
-  `;
-}
-
-function renderDonut(byCategory) {
-  const cv = document.getElementById("donutChart");
-  animateOnceVisible(cv, (progress) => drawDonut(cv, byCategory, progress));
-  renderDonutLegend(document.getElementById("donutLegend"), byCategory);
-}
-
-/* ── property explorer — search, revenue waterfall, portfolio-rank comparison.
-   Real API calls (/revenue/{id}), no client-side mock data. ── */
-function initExplorer(properties, sortedByRevenue) {
-  const search = document.getElementById("explSearch");
-  const dropdown = document.getElementById("explDropdown");
-  const empty = document.getElementById("explEmpty");
-  const body = document.getElementById("explBody");
-
-  function openDropdown(query) {
-    const q = query.trim().toLowerCase();
-    const matches = q
-      ? properties.filter((p) => p.canonical_name.toLowerCase().includes(q))
-      : properties;
-    if (!matches.length) { dropdown.classList.remove("open"); return; }
-    dropdown.innerHTML = matches.slice(0, 8).map((p) =>
-      `<div data-id="${p.property_id}">${p.canonical_name}</div>`
-    ).join("");
-    dropdown.classList.add("open");
-  }
-
-  search.addEventListener("input", () => openDropdown(search.value));
-  search.addEventListener("focus", () => openDropdown(search.value));
-  document.addEventListener("click", (e) => {
-    if (!e.target.closest(".explore-search-in")) dropdown.classList.remove("open");
-  });
-  dropdown.addEventListener("click", (e) => {
-    const id = e.target.dataset.id;
-    if (!id) return;
-    const p = properties.find((x) => x.property_id === id);
-    search.value = p.canonical_name;
-    dropdown.classList.remove("open");
-    selectProperty(id, p.canonical_name);
-  });
-
-  async function selectProperty(propertyId, name) {
-    const rev = await api(`/revenue/${propertyId}`);
-    empty.classList.add("hidden");
-    body.classList.add("on");
-    document.getElementById("explName").textContent = name;
-    document.getElementById("explId").textContent = propertyId;
-
-    const gross = rev.gross_revenue, conc = Math.abs(rev.concessions), net = rev.net_effective_revenue;
-    const max = Math.max(gross, net) || 1;
-    const heights = { gross: (gross / max) * 100, conc: (conc / max) * 100, net: (net / max) * 100 };
-
-    requestAnimationFrame(() => {
-      document.getElementById("wfGross").style.height = heights.gross + "%";
-      document.getElementById("wfConc").style.height = heights.conc + "%";
-      document.getElementById("wfNet").style.height = heights.net + "%";
-      ["wfGrossVal", "wfConcVal", "wfNetVal"].forEach((id) => document.getElementById(id).classList.add("shown"));
-      document.getElementById("wfGrossVal").textContent = fmtMoney(gross);
-      document.getElementById("wfConcVal").textContent = fmtMoneySigned(rev.concessions);
-      document.getElementById("wfNetVal").textContent = fmtMoney(net);
-    });
-
-    const rankMax = sortedByRevenue[0].net_effective_revenue || 1;
-    document.getElementById("explRank").innerHTML = sortedByRevenue.map((p) => `
-      <div class="rank-row ${p.property_id === propertyId ? "hl" : ""}">
-        <div class="rk-name">${p.canonical_name}</div>
-        <div class="rk-track"><div class="rk-fill" style="width:${(p.net_effective_revenue / rankMax) * 100}%"></div></div>
-      </div>
-    `).join("");
-  }
-
-  // pre-select the top property so the panel isn't empty on first paint
-  if (sortedByRevenue.length) {
-    search.value = sortedByRevenue[0].canonical_name;
-    selectProperty(sortedByRevenue[0].property_id, sortedByRevenue[0].canonical_name);
-  }
-}
-
-function renderMarquee(sorted) {
-  const cardHtml = (p) => `
-    <div class="prop-card">
-      <div class="n">${p.canonical_name}</div>
-      <div class="d">${p.property_id}</div>
-      <div class="r"><span>Net effective</span><span class="rev mono">${fmtMoney(p.net_effective_revenue)}</span></div>
-    </div>`;
-  const half = Math.ceil(sorted.length / 2);
-  document.getElementById("mq1").innerHTML = sorted.slice(0, half).concat(sorted.slice(0, half)).map(cardHtml).join("");
-  document.getElementById("mq2").innerHTML = sorted.slice(half).concat(sorted.slice(half)).map(cardHtml).join("");
 }
 
 /* ── sign-in modal (cosmetic only, no real auth) -- Enter navigates to the dashboard ── */

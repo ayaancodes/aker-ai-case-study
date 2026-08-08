@@ -19,6 +19,20 @@ app = FastAPI(title="Aker Portfolio API")
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 
 
+@app.middleware("http")
+async def no_cache_static(request, call_next):
+    """Browsers were serving stale copies of the dashboard's HTML/JS/CSS from HTTP
+    cache across iterations (StaticFiles responses are cacheable by default), which
+    made every frontend change look broken until a hard refresh. no-cache keeps
+    revalidation cheap (304s via Last-Modified still work) but guarantees the browser
+    always checks with the server first."""
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.endswith((".html", ".js", ".css")):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}

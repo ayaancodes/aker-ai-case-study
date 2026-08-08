@@ -13,9 +13,8 @@
 
 <div class="cursor-glow" id="cursorGlow"></div>
 
-<!-- ───────── SIGN-IN MODAL (cosmetic only, no real auth) — opens on top of the page
-     with its own backdrop, so it can't collide with the hero/ticker layout the way the
-     old docked card did. "Enter" navigates to the dashboard. ───────── -->
+<!-- ───────── SIGN-IN MODAL (cosmetic only, no real auth) — opened from the hero CTA
+     or the nav button. "Enter" navigates to the dashboard. ───────── -->
 <div class="modal" id="loginModal" aria-hidden="true">
   <div class="modal-backdrop" id="loginBackdrop"></div>
   <div class="modal-card">
@@ -24,7 +23,7 @@
     <h2>Welcome back.</h2>
     <p>Sign in to open the dashboard.</p>
     <label class="gate-label">Email</label>
-    <input class="gate-input" type="email" placeholder="you@aker.com" autocomplete="off">
+    <input class="gate-input" type="email" placeholder="moe@aker-ai.com" autocomplete="off">
     <label class="gate-label">Password</label>
     <input class="gate-input" type="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="off">
     <button class="btn btn-grad btn-lg gate-enter" id="gateEnter">Enter &rarr;</button>
@@ -38,145 +37,27 @@
       <span class="logo-mark">A</span>
       <span class="logo-name">Aker <em>Terminal</em></span>
     </a>
-    <div class="nav-links links">
-      <a href="#explore">Explore</a>
-      <a href="#revenue">Revenue</a>
-      <a href="#risk">Risk</a>
-      <a href="#library">Portfolio</a>
-    </div>
     <div class="nav-cta">
-      <a class="btn btn-ghost" href="/docs" target="_blank">API Docs</a>
+      <a class="btn btn-ghost" href="how-it-works.html">How it's built</a>
       <button class="btn btn-grad" data-open-login>Sign in</button>
     </div>
   </div>
 </nav>
 
-<!-- ───────── HERO — big type over a moving field, nothing else competing with it ───────── -->
+<!-- ───────── PERSONALIZED LANDING — a greeting and the live portfolio pulse, nothing
+     else. The full analytics live behind the terminal, not on the front door. ───────── -->
 <section class="hero" id="top">
   <canvas id="heroField"></canvas>
   <div class="wrap hero-in">
-    <div class="eyebrow"><span class="dot"></span>LIVE</div>
-    <h1>Your portfolio,<br><span class="grad-text">computed live.</span></h1>
-    <p class="hero-sub">No mocked numbers. Every figure below comes from the database.</p>
+    <div class="eyebrow"><span class="dot"></span>AKER AI &middot; PORTFOLIO TERMINAL</div>
+    <h1>Welcome back,<br><span class="grad-text">Moe.</span></h1>
+    <p class="hero-sub mono" id="portfolioPulse">&mdash;</p>
     <div class="hero-ctas">
       <button class="btn btn-grad btn-lg" data-open-login>Enter the terminal &rarr;</button>
-      <a class="btn btn-ghost btn-lg" href="#explore">Explore the data</a>
     </div>
     <div class="hero-note"><span class="live-dot"></span><span id="asOfNote">AS OF &mdash;</span></div>
   </div>
   <div class="tape" aria-hidden="true"><div class="tape-track" id="tape"></div></div>
-</section>
-
-<section class="eq-sec" id="explore">
-  <div class="wrap">
-    <div class="sec-head reveal">
-      <h2>Pick a property.<br><span class="grad-text">Watch the real numbers move.</span></h2>
-    </div>
-    <div class="explore-panel reveal">
-      <div class="explore-search">
-        <div class="explore-search-in">
-          <input type="text" id="explSearch" placeholder="Search a property&hellip; try &quot;Winners Circle&quot;" autocomplete="off">
-          <div class="explore-dropdown" id="explDropdown"></div>
-        </div>
-      </div>
-      <div class="explore-empty" id="explEmpty">Search above, or pick one from the portfolio section below.</div>
-      <div class="explore-body" id="explBody">
-        <div class="explore-name" id="explName"></div>
-        <div class="explore-id" id="explId"></div>
-        <div class="waterfall">
-          <div class="wf-col">
-            <div class="wf-val mono" id="wfGrossVal"></div>
-            <div class="wf-bar gross" id="wfGross" style="height:0"></div>
-            <div class="wf-label">Gross</div>
-          </div>
-          <div class="wf-col">
-            <div class="wf-val mono" id="wfConcVal"></div>
-            <div class="wf-bar concession" id="wfConc" style="height:0"></div>
-            <div class="wf-label">Concessions</div>
-          </div>
-          <div class="wf-col">
-            <div class="wf-val mono" id="wfNetVal"></div>
-            <div class="wf-bar net" id="wfNet" style="height:0"></div>
-            <div class="wf-label">Net effective</div>
-          </div>
-        </div>
-        <div class="explore-rank">
-          <div class="explore-rank-label">Vs. the rest of the portfolio</div>
-          <div id="explRank"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="eq-sec" id="revenue">
-  <div class="orb orb-v" style="width:420px;height:420px;bottom:-100px;left:-150px"></div>
-  <div class="wrap">
-    <div class="eq-panel reveal">
-      <div class="eq-head">
-        <div>
-          <div class="eq-title">Net effective revenue by property</div>
-          <div class="eq-sub" id="revenueSub">latest snapshot</div>
-        </div>
-        <span class="badge" id="revenueBadge">&check; VALIDATED LIVE</span>
-      </div>
-      <div class="eq-body"><canvas id="revenueChart"></canvas><div class="eq-tip" id="revenueTip"></div></div>
-      <div class="eq-foot" id="revenueFoot"></div>
-    </div>
-  </div>
-</section>
-
-<section class="eq-sec" id="composition">
-  <div class="wrap">
-    <div class="eq-panel reveal">
-      <div class="eq-head">
-        <div>
-          <div class="eq-title">Revenue mix</div>
-          <div class="eq-sub">by charge category</div>
-        </div>
-      </div>
-      <div class="eq-body eq-body-split">
-        <canvas id="donutChart"></canvas>
-        <div class="donut-legend" id="donutLegend"></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="eq-sec" id="risk">
-  <div class="wrap">
-    <div class="sec-head reveal">
-      <h2>Risk</h2>
-    </div>
-    <div class="risk-grid">
-      <div class="eq-panel reveal">
-        <div class="eq-head">
-          <div>
-            <div class="eq-title">Delinquent balances</div>
-            <div class="eq-sub">positive balance owed, highest first</div>
-          </div>
-        </div>
-        <div class="risk-list" id="delinquentList"></div>
-      </div>
-      <div class="eq-panel reveal">
-        <div class="eq-head">
-          <div>
-            <div class="eq-title">Lease rollover</div>
-            <div class="eq-sub">expiring within 60 days</div>
-          </div>
-        </div>
-        <div class="risk-list" id="leaseList"></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="lib-sec" id="library">
-  <div class="wrap sec-head reveal">
-    <h2>Portfolio</h2>
-  </div>
-  <div class="marquee"><div class="marquee-track" id="mq1"></div></div>
-  <div class="marquee m2"><div class="marquee-track" id="mq2"></div></div>
 </section>
 
 <footer>
@@ -186,8 +67,8 @@
       <p>Aker AI round 2 case study.</p>
     </div>
     <div class="foot-col">
-      <div><h5>Product</h5><a href="#explore">Explore</a><a href="#revenue">Revenue</a><a href="#library">Portfolio</a></div>
-      <div><h5>More</h5><a href="how-it-works.html">How it's built</a><a href="/docs" target="_blank">API reference</a></div>
+      <div><h5>Product</h5><a href="dashboard.html">Dashboard</a><a href="/docs" target="_blank">API reference</a></div>
+      <div><h5>More</h5><a href="how-it-works.html">How it's built</a></div>
     </div>
   </div>
   <div class="wrap foot-base">
