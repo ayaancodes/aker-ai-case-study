@@ -52,6 +52,9 @@ a specific property?" -- but only when actually ambiguous, never as a reflex.
 
 How to write (this is a product, not an essay):
 - Never use an em dash or en dash. Use a period and start a new sentence.
+- Lists you receive are often capped, and the on-screen table shows at most 10 rows
+  with a "showing N of M" note. Never claim the full list is displayed. If total_count
+  exceeds the rows you saw, that IS the partial-data case: say it first.
 - Short plain sentences. One idea per sentence.
 - Round dollar figures in prose ($7.56M, $144K). The card carries exact numbers.
 - Never enumerate rankings in prose ("X leads at A, followed by B at C, and D at E").
@@ -449,7 +452,10 @@ def stream_chat(history, tool_dispatch):
             ) as stream:
                 for event in stream:
                     if event.type == "content_block_delta" and event.delta.type == "text_delta":
-                        yield _sse("text_delta", {"text": event.delta.text})
+                        # deterministic backstop for the no-dash rule: the prompt asks,
+                        # this enforces. A dash is a single character, so it can never
+                        # be split across two deltas.
+                        yield _sse("text_delta", {"text": event.delta.text.replace("—", ", ").replace("–", ", ")})
                 final_message = stream.get_final_message()
         except Exception as e:
             yield _sse("error", {"message": str(e)})

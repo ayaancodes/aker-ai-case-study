@@ -303,7 +303,13 @@ async function sendMessage(forcedText) {
     if (fullText) chatHistory.push({ role: "assistant", content: fullText });
 
     // evidence after prose: first dataset becomes the card, the rest collapse into
-    // expandable chips -- one graphic max unless the user asks for more
+    // expandable chips -- one graphic max unless the user asks for more.
+    // list_properties is a name-resolution step, not evidence: never let it claim
+    // the one card slot when a real dataset arrived in the same turn.
+    if (pendingEvidence.length > 1) {
+      const real = pendingEvidence.filter((e) => e.tool !== "list_properties");
+      if (real.length) pendingEvidence.splice(0, pendingEvidence.length, ...real);
+    }
     const anchor = assistantEl ? assistantEl.closest(".copilot-msg") : copilotMessages.lastElementChild;
     let lastEl = anchor;
     const clean = !groundingUnverified;

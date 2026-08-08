@@ -113,8 +113,7 @@ Everything below is built, tested against the real 25+25 source files, and pushe
   and a **units table with search/status/type filters**; clicking a unit opens a
   detail modal (tenancy facts + real charge lines via `GET /units/{id}`).
 - **`web/copilot.html`** — the AM Copilot chat, its own full page styled after Aker's
-  actual product screenshots (charcoal-green palette, cream text, green/amber accents,
-  scoped via `.copilot-page` CSS variable overrides). Streams from `POST /chat`:
+  actual product screenshots. Streams from `POST /chat`:
   throttled typewriter text (time-based, click-to-skip), evidence rendered AFTER the
   prose finishes, **one data card max per response** with further datasets collapsed
   into expandable chips, Vega-methodology motion (popin cards, staggered table rows,
@@ -142,8 +141,10 @@ Everything below is built, tested against the real 25+25 source files, and pushe
 - **Typography**: Bricolage Grotesque for headings, JetBrains Mono for every number
   (this matters — it's what makes it read as a financial terminal), Instrument Sans for
   body copy.
-- **Color**: near-black background, cyan accent (`#6fd2ff`), green/red for
-  profit/loss-style signals, glass/blur cards.
+- **Color**: the Aker colourway, app-wide since the copilot page's palette was
+  promoted to `:root` — charcoal with a green cast (`#0B0D0C`), cream ink (`#EDEBE4`),
+  institutional green accent (`#7FC79B`), amber (`#C9A96A`) for watch/caution states,
+  soft green/terracotta for profit/loss. Glass/blur cards unchanged.
 - **Hero background**: a perspective particle-wave field, adapted directly from
   `design-references/vega-reference.html`'s canvas code (2D canvas version, not the
   Three.js one — simpler, no extra dependency). Full permission to reuse/adapt was
