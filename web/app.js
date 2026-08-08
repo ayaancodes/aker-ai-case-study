@@ -135,11 +135,15 @@ function drawRevenueChart(cv, tipEl, data, progress = 1) {
   const { ctx, w, h } = fitCanvas(cv);
   ctx.clearRect(0, 0, w, h);
   const max = Math.max(...data.map((d) => d.net_effective_revenue));
-  const labelW = 190;
-  const amtW = 100;
-  const barMaxW = w - labelW - amtW - 16;
+  // labelW/amtW scale down on narrow canvases (mobile) instead of being fixed --
+  // fixed widths left literally negative space for the bar itself below ~420px wide.
+  const narrow = w < 420;
+  const labelW = narrow ? Math.round(w * 0.34) : 190;
+  const amtW = narrow ? Math.round(w * 0.22) : 100;
+  const maxLabelChars = narrow ? 10 : 22;
+  const barMaxW = Math.max(20, w - labelW - amtW - 16);
 
-  ctx.font = "500 12.5px 'Instrument Sans'";
+  ctx.font = `500 ${narrow ? 11 : 12.5}px 'Instrument Sans'`;
   ctx.textBaseline = "middle";
 
   const rows = data.map((d, i) => {
@@ -148,7 +152,9 @@ function drawRevenueChart(cv, tipEl, data, progress = 1) {
     const barW = fullBarW * progress;
 
     ctx.fillStyle = "#9aa3b0";
-    const label = d.canonical_name.length > 22 ? d.canonical_name.slice(0, 21) + "…" : d.canonical_name;
+    const label = d.canonical_name.length > maxLabelChars
+      ? d.canonical_name.slice(0, maxLabelChars - 1) + "…"
+      : d.canonical_name;
     ctx.fillText(label, 0, y);
 
     const trackX = labelW;
@@ -167,13 +173,13 @@ function drawRevenueChart(cv, tipEl, data, progress = 1) {
 
     if (progress > 0.6) {
       ctx.fillStyle = "#f4f6f9";
-      ctx.font = "600 12px 'JetBrains Mono'";
+      ctx.font = `600 ${narrow ? 10.5 : 12}px 'JetBrains Mono'`;
       ctx.globalAlpha = Math.min(1, (progress - 0.6) / 0.4);
       ctx.textAlign = "right";
       ctx.fillText(fmtMoney(d.net_effective_revenue), w, y);
       ctx.textAlign = "left";
       ctx.globalAlpha = 1;
-      ctx.font = "500 12.5px 'Instrument Sans'";
+      ctx.font = `500 ${narrow ? 11 : 12.5}px 'Instrument Sans'`;
     }
 
     return { y, top: i * rowH, bottom: (i + 1) * rowH, d };
