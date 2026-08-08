@@ -50,6 +50,16 @@ Rules:
   figure from a previous tool call in this conversation without re-checking if the
   question is about a different property or metric. Wrong numbers in a real estate
   portfolio tool are worse than no answer.
+- Call tools silently -- no "Let me check..." or "Now I'll pull..." narration before or
+  between tool calls. The interface already shows the user each tool call as it runs.
+  Write text only once you have what you need for the final answer.
+- The dataset contains NO geography, market, location, or property-age information.
+  Never invent or imply any (no "mid-Atlantic markets", no "urban assets"). More
+  broadly: never attribute a characteristic to a property that a tool result did not
+  actually contain.
+- Never guess an ID. If you need a specific unit, use unit_lookup with the property_id
+  and unit_number -- do not fish through unit lists or try plausible-looking unit_ids.
+  If you genuinely cannot resolve an identifier, say so.
 - Refer to properties by name AND code together on first mention, e.g. "Winners Circle
   (144)" -- the code is the real join key across the dataset, but nobody thinks in codes.
 - Known data quality gap, mention it when relevant: properties 175 (Kinwood Apartments),
@@ -98,13 +108,21 @@ TOOLS = [
     },
     {
         "name": "leases_expiring",
-        "description": "Leases expiring within a window of days from the data's latest as-of date. Portfolio-wide by default, or scoped to one property. Returns resident, unit, expiration date, and market rent for each.",
+        "description": "Leases expiring within a window of days AFTER the data's as-of date -- forward-looking only, it cannot see leases that already expired. For leases whose expiration date is already in the past (expired-but-still-occupied holdovers), use leases_holdover instead. Returns resident, unit (with unit_id for drill-down), property name, expiration date, and market rent.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "days": {"type": "integer", "description": "Lookout window in days. Defaults to 60."},
                 "property_id": {"type": "string", "description": "Optional: scope to one property's numeric code."},
             },
+        },
+    },
+    {
+        "name": "leases_holdover",
+        "description": "Occupied tenancies whose lease expiration date is already in the PAST relative to the as-of date -- residents who stayed on after their lease term lapsed ('expired, never renewed'). There are 331 of these portfolio-wide, some expired by over a decade. This is the right tool for 'which leases already expired', 'holdover tenants', or month-to-month risk questions; leases_expiring cannot see these.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"property_id": {"type": "string", "description": "Optional: scope to one property's numeric code."}},
         },
     },
     {
@@ -151,11 +169,23 @@ TOOLS = [
     },
     {
         "name": "unit_detail",
-        "description": "Full detail for one unit by its internal unit_id: dimensions, tenancy facts (deposits, move-in/out dates), and the actual charge line items with categories. Get unit_id from property_units first.",
+        "description": "Full detail for one unit by its internal unit_id: dimensions, tenancy facts (deposits, move-in/out dates), and the actual charge line items with categories. unit_id comes from property_units, delinquent_tenancies, leases_expiring, or leases_holdover results. If you only have a unit NUMBER (like '328-104'), use unit_lookup instead -- never guess a unit_id.",
         "input_schema": {
             "type": "object",
-            "properties": {"unit_id": {"type": "integer", "description": "Internal unit ID, from property_units"}},
+            "properties": {"unit_id": {"type": "integer", "description": "Internal unit ID from a prior tool result"}},
             "required": ["unit_id"],
+        },
+    },
+    {
+        "name": "unit_lookup",
+        "description": "Resolve a unit by property code + the human-readable unit number (e.g. property 139, unit '328-104') straight to the same full detail unit_detail returns: tenancy facts, deposits, dates, and charge line items. Use this whenever you have a unit number but not its internal unit_id.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "property_id": {"type": "string", "description": "The property's numeric code, e.g. '139'"},
+                "unit_number": {"type": "string", "description": "The unit number as displayed, e.g. '328-104'"},
+            },
+            "required": ["property_id", "unit_number"],
         },
     },
     {
@@ -175,6 +205,8 @@ _LABELS = {
     "property_revenue": lambda a: f"Checking revenue for {a.get('property_id', '')}",
     "leases_expiring": lambda a: f"Checking leases expiring in {a.get('days', 60)} days"
         + (f" at {a['property_id']}" if a.get("property_id") else " portfolio-wide"),
+    "leases_holdover": lambda a: "Checking expired-but-occupied holdover leases"
+        + (f" at {a['property_id']}" if a.get("property_id") else " portfolio-wide"),
     "delinquent_tenancies": lambda a: "Checking delinquent balances"
         + (f" at {a['property_id']}" if a.get("property_id") else " portfolio-wide"),
     "anomalies": lambda a: "Checking data quality flags"
@@ -183,6 +215,7 @@ _LABELS = {
     "occupancy_property": lambda a: f"Checking occupancy for {a.get('property_id', '')}",
     "property_units": lambda a: f"Pulling units for {a.get('property_id', '')}",
     "unit_detail": lambda a: f"Looking up unit {a.get('unit_id', '')}",
+    "unit_lookup": lambda a: f"Looking up unit {a.get('unit_number', '')} at {a.get('property_id', '')}",
     "portfolio_stats": lambda a: "Pulling portfolio stats",
 }
 

@@ -7,6 +7,7 @@
   --cyan:#6fd2ff;
   --profit:#34d399;--loss:#f87171;
   --grad:linear-gradient(120deg,#c4ecff 0%,#6fd2ff 55%,#3fa9e8 100%);
+  --serif:Georgia,'Times New Roman',ui-serif,serif;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth;overflow-x:hidden}
@@ -346,8 +347,13 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;position:relative;z-
 .copilot-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px}
 .copilot-msg{display:flex;align-items:flex-start;gap:9px}
 .copilot-msg.user{flex-direction:row-reverse}
-.copilot-bubble-text{max-width:265px;font-size:13px;line-height:1.55;padding:10px 13px;
-  border-radius:13px;border:1px solid var(--line);background:var(--glass);white-space:pre-wrap;word-wrap:break-word}
+/* message prose is Claude-style literary serif (Georgia stack -- Anthropic Serif
+   itself isn't a public font, this is the same stack Claude falls back to). Only the
+   prose: cards, KPIs, tables and status lines stay sans/mono -- data should look like
+   data. Serif wants a touch more line-height than the sans body elsewhere. */
+.copilot-bubble-text{max-width:440px;font-family:var(--serif);font-size:14px;line-height:1.65;
+  padding:10px 14px;border-radius:13px;border:1px solid var(--line);background:var(--glass);
+  white-space:pre-wrap;word-wrap:break-word}
 .copilot-msg.user .copilot-bubble-text{background:rgba(111,210,255,.1);border-color:rgba(111,210,255,.28)}
 .copilot-msg.error .copilot-bubble-text{background:rgba(248,113,113,.08);border-color:rgba(248,113,113,.32);color:#fca5a5}
 

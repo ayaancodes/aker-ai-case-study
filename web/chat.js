@@ -143,7 +143,7 @@ function renderToolResult(name, result) {
       case "delinquent_tenancies": {
         if (!result.length) { makeCard(`<div class="copilot-empty">No outstanding balances.</div>`); return; }
         makeCard(tableHtml(
-          [{ key: "resident_name", label: "Resident" }, { key: "property_id", label: "Prop" }, { key: "unit_number", label: "Unit" }, { key: "balance", label: "Balance", fmt: fmtMoney }],
+          [{ key: "resident_name", label: "Resident" }, { key: "canonical_name", label: "Property" }, { key: "unit_number", label: "Unit" }, { key: "balance", label: "Balance", fmt: fmtMoney }],
           [...result].sort((a, b) => b.balance - a.balance)
         ));
         return;
@@ -151,8 +151,16 @@ function renderToolResult(name, result) {
       case "leases_expiring": {
         if (!result.leases.length) { makeCard(`<div class="copilot-empty">Nothing expiring in this window.</div>`); return; }
         makeCard(tableHtml(
-          [{ key: "resident_name", label: "Resident" }, { key: "property_id", label: "Prop" }, { key: "unit_number", label: "Unit" }, { key: "lease_expiration", label: "Expires" }, { key: "market_rent", label: "Rent", fmt: (v) => v ? fmtMoney(v) : "&mdash;" }],
+          [{ key: "resident_name", label: "Resident" }, { key: "canonical_name", label: "Property" }, { key: "unit_number", label: "Unit" }, { key: "lease_expiration", label: "Expires" }, { key: "market_rent", label: "Rent", fmt: (v) => v ? fmtMoney(v) : "&mdash;" }],
           result.leases
+        ));
+        return;
+      }
+      case "leases_holdover": {
+        if (!result.holdovers.length) { makeCard(`<div class="copilot-empty">No holdover leases.</div>`); return; }
+        makeCard(kpiRowHtml([["Holdovers", result.holdover_count], ["As of", result.reference_date]]) + tableHtml(
+          [{ key: "resident_name", label: "Resident" }, { key: "canonical_name", label: "Property" }, { key: "unit_number", label: "Unit" }, { key: "lease_expiration", label: "Expired" }, { key: "market_rent", label: "Rent", fmt: (v) => v ? fmtMoney(v) : "&mdash;" }],
+          result.holdovers
         ));
         return;
       }
@@ -172,6 +180,12 @@ function renderToolResult(name, result) {
         ));
         return;
       }
+      case "unit_lookup":
+        // same payload shape as unit_detail when exactly one unit matched; the rare
+        // multiple-match shape has no single tenancy to card, so skip the card and let
+        // the model's text explain the choices
+        if (result.multiple_matches) return;
+        // fall through
       case "unit_detail": {
         const t = result.tenancy;
         const kpi = kpiRowHtml([
@@ -276,6 +290,12 @@ async function sendMessage() {
           sawAnyOutput = true;
           thinkingText.textContent = data.label;
           addToolChip(data.label);
+          // if the model narrated before this tool call despite the prompt telling it
+          // not to, make sure the post-tool text starts a fresh paragraph instead of
+          // gluing onto the preamble mid-sentence
+          if (assistantText && !assistantText.endsWith("\n\n")) {
+            assistantText += "\n\n";
+          }
         } else if (event === "tool_result") {
           renderToolResult(data.tool, data.result);
           thinkingText.textContent = "Writing the answer";
