@@ -44,6 +44,10 @@ function particleField(cv) {
   frame();
 }
 
+// The gate starts open (it's the first thing shown), so the hero needs to make room
+// for it immediately -- not just on some later toggle.
+document.body.classList.add("gate-open");
+
 async function init() {
   const [revenue, properties, delinquent, leases] = await Promise.all([
     api("/revenue/portfolio"),

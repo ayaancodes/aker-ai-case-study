@@ -50,6 +50,15 @@ section{position:relative}
   .gate{align-items:flex-end;justify-content:center;padding:20px}
   .gate-form{max-width:none}
 }
+/* While the gate card is docked on the right, the hero content actually needs to make
+   room for it -- a floating card with no reserved layout space just runs the centered
+   headline and ticker straight through it at wide viewports. Shifts the hero-in wrap
+   and ticker left instead of narrowing them symmetrically, so the visible strip next to
+   the card is where the text actually lands. */
+@media (min-width:821px){
+  body.gate-open .hero .wrap{margin-right:440px}
+  body.gate-open .tape{margin-right:420px}
+}
 
 /* NAV */
 nav{position:fixed;top:0;left:0;right:0;z-index:50;backdrop-filter:blur(16px);background:rgba(5,5,7,.82);border-bottom:1px solid transparent;transition:border-color .3s}
