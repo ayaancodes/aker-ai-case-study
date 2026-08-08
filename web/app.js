@@ -35,9 +35,9 @@ function particleField(cv) {
         const wob = Math.sin(x * 0.3 + t) * amp * 0.5 + Math.cos(z * 0.32 + t * 0.8) * amp * 0.5;
         const X = W / 2 + (px - 0.5) * spread;
         const Y = y0 + wob;
-        const r = Math.round(111 + (59 - 111) * px);
-        const g = Math.round(210 + (91 - 210) * px);
-        const b = Math.round(255 + (133 - 255) * px);
+        const r = Math.round(127 + (62 - 127) * px);
+        const g = Math.round(199 + (107 - 199) * px);
+        const b = Math.round(155 + (79 - 155) * px);
         ctx.fillStyle = `rgba(${r},${g},${b},${0.1 + 0.35 * pz})`;
         ctx.beginPath();
         ctx.arc(X, Y, size, 0, Math.PI * 2);

@@ -145,12 +145,12 @@ function drawKpiProgress(id, pct) {
   ctx.fillStyle = "rgba(148,163,184,.14)";
   ctx.beginPath(); ctx.roundRect(0, barY, w, barH, 99); ctx.fill();
   const grad = ctx.createLinearGradient(0, 0, w * pct / 100, 0);
-  grad.addColorStop(0, "#6fd2ff"); grad.addColorStop(1, "#3fa9e8");
+  grad.addColorStop(0, "#7FC79B"); grad.addColorStop(1, "#3E6B4F");
   ctx.fillStyle = grad;
   ctx.beginPath(); ctx.roundRect(0, barY, Math.max(w * pct / 100, 4), barH, 99); ctx.fill();
 }
 
-const SEG_PALETTE = ["#6fd2ff", "#3fa9e8", "#94a3b8", "#a78bfa", "#f0b429", "#5e6673"];
+const SEG_PALETTE = ["#7FC79B", "#3E6B4F", "#9AA49D", "#a78bfa", "#C9A96A", "#5E675F"];
 
 function topSegments(rows, getValue, topN = 5) {
   const sorted = [...rows].sort((a, b) => getValue(b) - getValue(a));
@@ -199,14 +199,14 @@ function renderPortfolioKpis(revenue, occupancy, delinquent, leases, leaseRefDat
 
   drawKpiSegments("kpiNetViz", topSegments(revenue.by_property, (p) => p.net_effective_revenue));
   drawKpiSegments("kpiGrossViz", [
-    { value: revenue.total_gross_revenue, color: "#6fd2ff" },
-    { value: Math.abs(revenue.total_concessions), color: "#f87171" },
+    { value: revenue.total_gross_revenue, color: "#7FC79B" },
+    { value: Math.abs(revenue.total_concessions), color: "#E2836F" },
   ]);
   if (occupancy.pct_occ != null) drawKpiProgress("kpiOccViz", occupancy.pct_occ);
-  drawKpiSegments("kpiDelViz", topSegments(delinquent, (r) => r.balance).map((s) => ({ ...s, color: s.color === "rgba(148,163,184,.25)" ? s.color : "#f87171" })));
+  drawKpiSegments("kpiDelViz", topSegments(delinquent, (r) => r.balance).map((s) => ({ ...s, color: s.color === "rgba(148,163,184,.25)" ? s.color : "#E2836F" })));
   drawKpiSegments("kpiRollViz", [
-    { value: within30 || 0.0001, color: "#f0b429" },
-    { value: (leases.length - within30) || 0.0001, color: "rgba(240,180,41,.3)" },
+    { value: within30 || 0.0001, color: "#C9A96A" },
+    { value: (leases.length - within30) || 0.0001, color: "rgba(201,169,106,.35)" },
   ]);
 }
 
@@ -248,16 +248,16 @@ function renderPropertyKpis(rev, occ, delinquent, leases) {
     kpiTile(leases.length, "Rolling over (60d)", null, "HOVER FOR NEXT EXPIRATIONS", rolloverPop);
 
   drawKpiSegments("kpiPNetViz", [
-    { value: rev.net_effective_revenue || 0.0001, color: "#34d399" },
-    { value: Math.abs(rev.concessions), color: "#f87171" },
+    { value: rev.net_effective_revenue || 0.0001, color: "#4CAF82" },
+    { value: Math.abs(rev.concessions), color: "#E2836F" },
   ]);
   if (occ.pct_occ != null) drawKpiProgress("kpiPOccViz", occ.pct_occ);
   drawKpiSegments("kpiPUnitsViz", [
-    { value: occ.occupied || 0.0001, color: "#34d399" },
-    { value: occ.on_notice, color: "#f0b429" },
-    { value: occ.vacant, color: "#f87171" },
+    { value: occ.occupied || 0.0001, color: "#4CAF82" },
+    { value: occ.on_notice, color: "#C9A96A" },
+    { value: occ.vacant, color: "#E2836F" },
   ].filter((s) => s.value > 0));
-  drawKpiSegments("kpiPDelViz", topSegments(delinquent, (r) => r.balance).map((s) => ({ ...s, color: s.color === "rgba(148,163,184,.25)" ? s.color : "#f87171" })));
+  drawKpiSegments("kpiPDelViz", topSegments(delinquent, (r) => r.balance).map((s) => ({ ...s, color: s.color === "rgba(148,163,184,.25)" ? s.color : "#E2836F" })));
 }
 
 function renderRevenueChart(sorted) {

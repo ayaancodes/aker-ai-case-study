@@ -1,13 +1,15 @@
 :root{
   color-scheme:dark;
-  --void:#050507;--void-2:#0a0b0f;
-  --glass:rgba(255,255,255,.04);--glass-2:rgba(255,255,255,.025);
-  --line:rgba(148,163,184,.14);--line-2:rgba(148,163,184,.08);
-  --ink:#f4f6f9;--dim:#9aa3b0;--faint:#5e6673;
-  --cyan:#6fd2ff;
-  --profit:#34d399;--loss:#f87171;
-  --grad:linear-gradient(120deg,#c4ecff 0%,#6fd2ff 55%,#3fa9e8 100%);
-  --serif:Georgia,'Times New Roman',ui-serif,serif;
+  /* Aker colourway, promoted app-wide from the copilot page after sign-off:
+     charcoal with a green cast, cream ink, institutional green accent, amber watch */
+  --void:#0B0D0C;--void-2:#101412;
+  --glass:rgba(237,235,228,.045);--glass-2:rgba(237,235,228,.03);
+  --line:rgba(154,164,157,.16);--line-2:rgba(154,164,157,.09);
+  --ink:#EDEBE4;--dim:#9AA49D;--faint:#5E675F;
+  --cyan:#7FC79B;
+  --profit:#4CAF82;--loss:#E2836F;
+  --grad:linear-gradient(120deg,#D8EFDF 0%,#7FC79B 55%,#3E6B4F 100%);
+  --warn:#C9A96A;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth;overflow-x:hidden}
@@ -15,17 +17,17 @@ section[id]{scroll-margin-top:86px}
 body{background:var(--void);color:var(--ink);font-family:'Instrument Sans',system-ui,sans-serif;font-size:15px;line-height:1.6;overflow-x:hidden}
 .mono,code{font-family:'JetBrains Mono',monospace}
 .up{color:var(--profit)}.down{color:var(--loss)}
-.grad-text{background:linear-gradient(100deg,#f2faff 0%,#9fdfff 42%,#54c0f2 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.grad-text{background:linear-gradient(100deg,#F7F5EE 0%,#C9E8D3 42%,#7FC79B 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
 section{position:relative}
 .wrap{max-width:1180px;margin:0 auto;padding:0 28px}
 
 .orb{position:absolute;border-radius:50%;filter:blur(90px);pointer-events:none;opacity:.3;z-index:0}
 .orb-v{background:radial-gradient(circle,rgba(148,163,184,.5),transparent 65%)}
-.orb-c{background:radial-gradient(circle,rgba(111,210,255,.4),transparent 65%)}
+.orb-c{background:radial-gradient(circle,rgba(127,199,155,.4),transparent 65%)}
 
 /* cursor-follow spotlight, whole page */
 .cursor-glow{position:fixed;top:0;left:0;width:520px;height:520px;border-radius:50%;pointer-events:none;z-index:2;
-  background:radial-gradient(circle,rgba(111,210,255,.06),transparent 70%);
+  background:radial-gradient(circle,rgba(127,199,155,.06),transparent 70%);
   transform:translate(-50%,-50%);will-change:transform;transition:opacity .3s;opacity:0}
 .cursor-glow.on{opacity:1}
 @media (hover:none){.cursor-glow{display:none}}
@@ -60,7 +62,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:50;backdrop-filter:blur(16px);ba
 nav.scrolled{border-bottom-color:var(--line)}
 .nav-in{max-width:1180px;margin:0 auto;padding:16px 28px;display:flex;align-items:center;gap:30px}
 .logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink)}
-.logo-mark{width:30px;height:30px;border-radius:9px;background:var(--grad);display:grid;place-items:center;font-family:'Bricolage Grotesque';font-weight:700;font-size:14px;color:#04101a;flex:none}
+.logo-mark{width:30px;height:30px;border-radius:9px;background:var(--grad);display:grid;place-items:center;font-family:'Bricolage Grotesque';font-weight:700;font-size:14px;color:#06130B;flex:none}
 .logo-name{font-family:'Bricolage Grotesque';font-weight:600;font-size:17px}
 .logo-name em{font-style:normal;color:var(--ink)}
 .nav-links{display:flex;gap:26px;margin-left:14px}
@@ -70,7 +72,7 @@ nav.scrolled{border-bottom-color:var(--line)}
 .btn{font-family:'Bricolage Grotesque';font-weight:600;font-size:13.5px;padding:10px 20px;border-radius:11px;cursor:pointer;border:1px solid transparent;transition:transform .18s ease,box-shadow .25s ease,border-color .2s,color .2s;text-decoration:none;display:inline-flex;align-items:center;gap:8px;color:var(--ink)}
 .btn-ghost{border-color:var(--line);color:var(--dim)}
 .btn-ghost:hover{color:var(--ink);border-color:rgba(148,163,184,.35)}
-.btn-grad{background:var(--cyan);color:#04131f;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 6px 18px rgba(111,210,255,.18)}
+.btn-grad{background:var(--cyan);color:#06130B;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 6px 18px rgba(127,199,155,.18)}
 .btn-lg{padding:14px 24px;font-size:15px;border-radius:12px}
 
 /* ───────── HERO — big type over a live canvas chart ───────── */
@@ -92,7 +94,7 @@ h1{font-family:'Bricolage Grotesque';font-weight:800;font-size:clamp(52px,10vw,1
 .tape:hover .tape-track{animation-play-state:paused}
 @keyframes scroll{to{transform:translate3d(-50%,0,0)}}
 .tk{display:inline-flex;align-items:center;gap:9px}
-.tk .chip{width:19px;height:19px;border-radius:6px;display:grid;place-items:center;font-family:'Bricolage Grotesque';font-weight:700;font-size:9.5px;color:#04101a;flex:none;background:var(--cyan)}
+.tk .chip{width:19px;height:19px;border-radius:6px;display:grid;place-items:center;font-family:'Bricolage Grotesque';font-weight:700;font-size:9.5px;color:#06130B;flex:none;background:var(--cyan)}
 .tk .sym{color:var(--ink);font-weight:600}
 .tk .px{color:var(--dim);animation:tick-flash 5s ease-in-out infinite;animation-delay:calc(var(--i,0) * .18s)}
 @keyframes tick-flash{0%,88%,100%{color:var(--dim)}92%{color:var(--cyan)}}
@@ -100,9 +102,9 @@ h1{font-family:'Bricolage Grotesque';font-weight:800;font-size:clamp(52px,10vw,1
 /* STATS */
 .stats{padding:56px 0 80px}
 .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-.stat{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:16px;padding:22px 22px 18px;background:radial-gradient(240px at 85% -20%,rgba(111,210,255,.07),transparent 62%),var(--void-2);transition:transform .2s ease,border-color .2s ease}
-.stat::before{content:"";position:absolute;top:0;left:12%;right:12%;height:1px;background:linear-gradient(90deg,transparent,rgba(111,210,255,.55),rgba(148,163,184,.5),transparent)}
-.stat:hover{transform:translateY(-2px);border-color:rgba(111,210,255,.32)}
+.stat{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:16px;padding:22px 22px 18px;background:radial-gradient(240px at 85% -20%,rgba(127,199,155,.07),transparent 62%),var(--void-2);transition:transform .2s ease,border-color .2s ease}
+.stat::before{content:"";position:absolute;top:0;left:12%;right:12%;height:1px;background:linear-gradient(90deg,transparent,rgba(127,199,155,.55),rgba(148,163,184,.5),transparent)}
+.stat:hover{transform:translateY(-2px);border-color:rgba(127,199,155,.32)}
 .stat .v{font-family:'JetBrains Mono';font-size:34px;font-weight:700;letter-spacing:-.01em;line-height:1}
 .stat .k{font-size:12.5px;color:var(--dim);margin-top:9px}
 
@@ -116,10 +118,10 @@ h2{font-family:'Bricolage Grotesque';font-weight:700;font-size:clamp(28px,4.2vw,
 .pillars{padding:64px 0}
 .pillar-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
 .pillar{border:1px solid var(--line);border-radius:20px;background:var(--glass);padding:26px 26px;backdrop-filter:blur(14px);position:relative;overflow:hidden;transition:transform .25s,border-color .25s}
-.pillar:hover{transform:translateY(-2px);border-color:rgba(111,210,255,.26)}
-.pillar .corner-orb{position:absolute;top:-46px;right:-46px;width:130px;height:130px;border-radius:50%;pointer-events:none;background:radial-gradient(circle,rgba(111,210,255,.14),transparent 65%);opacity:0;transition:opacity .3s}
+.pillar:hover{transform:translateY(-2px);border-color:rgba(127,199,155,.26)}
+.pillar .corner-orb{position:absolute;top:-46px;right:-46px;width:130px;height:130px;border-radius:50%;pointer-events:none;background:radial-gradient(circle,rgba(127,199,155,.14),transparent 65%);opacity:0;transition:opacity .3s}
 .pillar:hover .corner-orb{opacity:1}
-.icon-wrap{width:44px;height:44px;border-radius:13px;padding:1px;margin-bottom:16px;background:linear-gradient(140deg,rgba(111,210,255,.55),rgba(148,163,184,.25) 60%,transparent)}
+.icon-wrap{width:44px;height:44px;border-radius:13px;padding:1px;margin-bottom:16px;background:linear-gradient(140deg,rgba(127,199,155,.55),rgba(148,163,184,.25) 60%,transparent)}
 .icon-in{width:100%;height:100%;border-radius:12px;background:var(--void-2);display:grid;place-items:center}
 .icon-in svg{width:19px;height:19px;stroke:var(--cyan);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .pillar h3{font-family:'Bricolage Grotesque';font-weight:600;font-size:17px;margin-bottom:12px}
@@ -128,7 +130,7 @@ h2{font-family:'Bricolage Grotesque';font-weight:700;font-size:clamp(28px,4.2vw,
 /* LOOP — no paragraph */
 .loop{padding:64px 0}
 .loop-track{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;position:relative;margin-top:10px}
-.loop-track::before{content:"";position:absolute;top:29px;left:11%;right:11%;height:2px;z-index:0;background:repeating-linear-gradient(90deg,rgba(111,210,255,.5) 0 9px,transparent 9px 17px)}
+.loop-track::before{content:"";position:absolute;top:29px;left:11%;right:11%;height:2px;z-index:0;background:repeating-linear-gradient(90deg,rgba(127,199,155,.5) 0 9px,transparent 9px 17px)}
 .loop-node{position:relative;z-index:1;text-align:center;padding:0 8px}
 .loop-dot{width:58px;height:58px;border-radius:50%;margin:0 auto 16px;background:rgba(10,11,15,.92);border:1px solid var(--line);display:grid;place-items:center;box-shadow:0 0 0 7px var(--void)}
 .loop-dot svg{width:22px;height:22px;stroke:var(--cyan);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
@@ -232,7 +234,7 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;position:relative;z-
 .dash-plist{display:flex;flex-direction:column;gap:2px}
 .dash-pitem{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;border-radius:9px;cursor:pointer;font-size:13px;color:var(--dim);transition:background .15s,color .15s}
 .dash-pitem:hover{background:var(--glass);color:var(--ink)}
-.dash-pitem.on{background:rgba(111,210,255,.1);color:var(--cyan);font-weight:600}
+.dash-pitem.on{background:rgba(127,199,155,.1);color:var(--cyan);font-weight:600}
 .dash-pitem .pi-amt{font-family:'JetBrains Mono';font-size:10.5px;color:inherit;opacity:.7}
 .dash-pitem.all{margin-bottom:8px;padding-bottom:9px;border-bottom:1px solid var(--line-2)}
 
@@ -246,7 +248,7 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;position:relative;z-
 
 /* hover popover on a KPI tile -- carries the detail that used to live in separate
    panels (revenue breakdown, top delinquent balances, next lease expirations) */
-.kpi-tile.has-pop:hover{border-color:rgba(111,210,255,.3)}
+.kpi-tile.has-pop:hover{border-color:rgba(127,199,155,.3)}
 .kpi-pop{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:30;
   background:#0c0e14;border:1px solid var(--line);border-radius:12px;padding:12px 14px;
   box-shadow:0 24px 60px rgba(0,0,0,.6);opacity:0;visibility:hidden;translate:0 -4px;
@@ -266,7 +268,7 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;position:relative;z-
 .unit-modal-heading{font-family:'JetBrains Mono';font-size:9.5px;letter-spacing:.12em;color:var(--faint);margin-bottom:8px}
 .unit-gap-note{font-size:12px;line-height:1.55;color:var(--loss);border:1px solid rgba(248,113,113,.3);background:rgba(248,113,113,.07);border-radius:10px;padding:10px 12px}
 .units-table tbody tr{cursor:pointer;transition:background .12s}
-.units-table tbody tr:hover{background:rgba(111,210,255,.05)}
+.units-table tbody tr:hover{background:rgba(127,199,155,.05)}
 @media (max-width:640px){.unit-modal-grid{grid-template-columns:1fr}}
 
 /* units toolbar */
@@ -322,16 +324,6 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;position:relative;z-
    amber for watch/caution states. Scoped entirely through the .copilot-page variable
    overrides below -- shared components (buttons, inputs, logo) pick the palette up
    automatically since they already read the variables. */
-.copilot-page{
-  --void:#0B0D0C;--void-2:#101412;
-  --glass:rgba(237,235,228,.045);--glass-2:rgba(237,235,228,.03);
-  --line:rgba(154,164,157,.16);--line-2:rgba(154,164,157,.09);
-  --ink:#EDEBE4;--dim:#9AA49D;--faint:#5E675F;
-  --cyan:#7FC79B;
-  --grad:linear-gradient(120deg,#D8EFDF 0%,#7FC79B 55%,#3E6B4F 100%);
-  --warn:#C9A96A;
-}
-.copilot-page .cursor-glow{background:radial-gradient(circle,rgba(127,199,155,.06),transparent 70%)}
 
 .copilot-layout{display:grid;grid-template-columns:250px 1fr;min-height:100vh;padding-top:64px}
 .copilot-sidebar{position:sticky;top:64px;height:calc(100vh - 64px);border-right:1px solid var(--line);

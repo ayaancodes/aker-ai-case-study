@@ -156,14 +156,14 @@ function drawBarChart(cv, tipEl, data, opts) {
     ctx.fillText(label, 0, y);
 
     const trackX = labelW;
-    ctx.fillStyle = "rgba(148,163,184,.12)";
+    ctx.fillStyle = "rgba(154,164,157,.12)";
     ctx.beginPath();
     ctx.roundRect(trackX, y - 4.5, barMaxW, 9, 99);
     ctx.fill();
 
     const grad = ctx.createLinearGradient(trackX, 0, trackX + Math.max(barW, 1), 0);
-    grad.addColorStop(0, "#6fd2ff");
-    grad.addColorStop(1, "#3fa9e8");
+    grad.addColorStop(0, "#7FC79B");
+    grad.addColorStop(1, "#3E6B4F");
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.roundRect(trackX, y - 4.5, barW, 9, 99);
@@ -218,16 +218,16 @@ function drawOccupancyChart(cv, tipEl, data, progress = 1) {
 
 /* ── donut chart, sweeps in on scroll-into-view ── */
 const CATEGORY_COLORS = {
-  base_rent: "#6fd2ff",
-  ancillary: "#94a3b8",
-  utility: "#34d399",
-  commercial: "#f0b429",
+  base_rent: "#7FC79B",
+  ancillary: "#9AA49D",
+  utility: "#5B8FA6",
+  commercial: "#C9A96A",
   subsidy: "#a78bfa",
-  fee: "#f87171",
-  concession: "#5e6673",
-  residential: "#6fd2ff",
+  fee: "#E2836F",
+  concession: "#5E675F",
+  residential: "#7FC79B",
   affordable: "#a78bfa",
-  land: "#5e6673",
+  land: "#5E675F",
 };
 function drawDonut(cv, byCategory, progress = 1, key = "category") {
   const { ctx, w, h } = fitCanvas(cv);
@@ -242,7 +242,7 @@ function drawDonut(cv, byCategory, progress = 1, key = "category") {
     ctx.arc(cx, cy, r, angle, angle + slice);
     ctx.arc(cx, cy, inner, angle + slice, angle, true);
     ctx.closePath();
-    ctx.fillStyle = CATEGORY_COLORS[c[key]] || "#6fd2ff";
+    ctx.fillStyle = CATEGORY_COLORS[c[key]] || "#7FC79B";
     ctx.fill();
     angle += slice;
   });
@@ -250,7 +250,7 @@ function drawDonut(cv, byCategory, progress = 1, key = "category") {
 function renderDonutLegend(legendEl, byCategory, key = "category") {
   legendEl.innerHTML = [...byCategory].sort((a, b) => b.amount - a.amount).map((c) => `
     <div class="dl-row">
-      <span class="dl-sw" style="background:${CATEGORY_COLORS[c[key]] || "#6fd2ff"}"></span>
+      <span class="dl-sw" style="background:${CATEGORY_COLORS[c[key]] || "#7FC79B"}"></span>
       <span class="dl-name">${c[key].replace("_", " ")}</span>
       <span class="dl-amt mono">${fmtMoneySigned(c.amount)}</span>
     </div>
