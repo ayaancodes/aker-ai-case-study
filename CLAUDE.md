@@ -104,10 +104,13 @@ Deadline: Monday, August 10.
 - Vacant units show resident name literally as "VACANT".
 - Bottom of file: property-level occupancy summary + a "Summary of Charges by Charge Code" table.
   These are aggregates, not new source rows — don't double-count them as unit-level data.
-- Confirmed real charge codes across the portfolio (33 total): RENT, RENTAFF, RENTHAP, RENTRETL,
-  RNTPROF, CONRENT, PARKING, CONPARK, GARAGE, CONGAR, PETFEE, PETFEEM, CONPETM, STORAGE, CONSTOR,
-  AMENITY, CONAMEN, TRASH, WATER, UTILCOM, BIKE, W/D, SDFEE, SALESTX, RETXEST, CAMEST, CAMINSR,
-  SEC8CRD, SUBSIDY, MTM, HOMEPCKG, CONEMP.
+- Confirmed real charge codes across the portfolio (32 total, verified by programmatic scan
+  of every charge-line row across all 25 files, not hand-counted): RENT, RENTAFF, RENTHAP,
+  RENTRETL, RNTPROF, CONRENT, PARKING, CONPARK, GARAGE, CONGAR, PETFEE, PETFEEM, CONPETM,
+  STORAGE, CONSTOR, AMENITY, CONAMEN, TRASH, WATER, UTILCOM, BIKE, W/D, SDFEE, SALESTX,
+  RETXEST, CAMEST, CAMINSR, SEC8CRD, SUBSIDY, MTM, HOMEPCKG, CONEMP. (Previously stated as
+  "33 total" here, an arithmetic error carried over from the initial investigation, caught
+  when building the charge_codes seed data.)
   - Presence of RENTHAP/SEC8CRD/SUBSIDY indicates some affordable/subsidized housing units.
   - Presence of CAMEST/CAMINSR/RENTRETL/RNTPROF indicates some commercial-flavored leases mixed
     into the portfolio — don't assume every property is a standard residential apartment complex.
