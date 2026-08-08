@@ -94,32 +94,26 @@ async function showPropertyView(propertyId) {
   document.getElementById("pId").textContent = propertyId;
 
   renderPropertyKpis(rev, occ, delinquent, leases.leases);
-
-  const gross = rev.gross_revenue, net = rev.net_effective_revenue;
-  const max = Math.max(gross, net) || 1;
-  requestAnimationFrame(() => {
-    document.getElementById("wfGross").style.height = (gross / max) * 100 + "%";
-    document.getElementById("wfConc").style.height = (Math.abs(rev.concessions) / max) * 100 + "%";
-    document.getElementById("wfNet").style.height = (net / max) * 100 + "%";
-    ["wfGrossVal", "wfConcVal", "wfNetVal"].forEach((id) => document.getElementById(id).classList.add("shown"));
-    document.getElementById("wfGrossVal").textContent = fmtMoney(gross);
-    document.getElementById("wfConcVal").textContent = fmtMoneySigned(rev.concessions);
-    document.getElementById("wfNetVal").textContent = fmtMoney(net);
-  });
-
-  renderDelinquentList("pDelinquentList", delinquent);
-  renderLeaseList("pLeaseList", leases.leases);
   renderUnitsTable(units);
 
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 /* ── KPI tiles with a small real-data visual under each number. No trend lines on
-   purpose -- one snapshot loaded, so every mini-viz shows composition, not time. ── */
-function kpiTile(value, label, vizId, legend) {
+   purpose -- one snapshot loaded, so every mini-viz shows composition, not time.
+   pop (optional) is extra detail HTML shown in a hover popover -- this replaced the
+   property view's separate revenue/delinquent/rollover panels. ── */
+function kpiTile(value, label, vizId, legend, pop) {
   const viz = vizId ? `<canvas id="${vizId}"></canvas>` : "";
   const leg = legend ? `<div class="kpi-legend">${legend}</div>` : "";
-  return `<div class="kpi-tile"><div class="kv">${value}</div><div class="kk">${label}</div>${viz}${leg}</div>`;
+  const popEl = pop ? `<div class="kpi-pop">${pop}</div>` : "";
+  return `<div class="kpi-tile ${pop ? "has-pop" : ""}"><div class="kv">${value}</div><div class="kk">${label}</div>${viz}${leg}${popEl}</div>`;
+}
+
+function popRows(pairs) {
+  return pairs.map(([k, v, cls]) =>
+    `<div class="pop-row"><span>${k}</span><span class="mono ${cls || ""}">${v}</span></div>`
+  ).join("");
 }
 
 /* segmented horizontal bar: segments = [{value, color}] */
@@ -176,17 +170,32 @@ function renderPortfolioKpis(revenue, occupancy, delinquent, leases, leaseRefDat
   const cutoff30 = d.toISOString().slice(0, 10);
   const within30 = leases.filter((l) => l.lease_expiration <= cutoff30).length;
 
+  const topProps = [...revenue.by_property]
+    .sort((a, b) => b.net_effective_revenue - a.net_effective_revenue).slice(0, 5);
+  const netPop = popRows(topProps.map((p) => [p.canonical_name, fmtMoney(p.net_effective_revenue)]));
+  const grossPop = popRows([
+    ["Gross", fmtMoney(revenue.total_gross_revenue)],
+    ["Concessions", fmtMoneySigned(revenue.total_concessions), "down"],
+    ["Net effective", fmtMoney(revenue.total_net_effective_revenue), "up"],
+  ]);
+  const delinquentPop = popRows(
+    delinquent.slice(0, 6).map((r) => [`${r.resident_name} · ${r.property_id}/${r.unit_number}`, fmtMoney(r.balance), "down"])
+  );
+  const rolloverPop = popRows(
+    leases.slice(0, 6).map((l) => [`${l.property_id}/${l.unit_number} · exp ${l.lease_expiration}`, l.market_rent ? fmtMoney(l.market_rent) : "—"])
+  );
+
   document.getElementById("dashKpiStrip").innerHTML =
     kpiTile(fmtMoney(revenue.total_net_effective_revenue), "Net effective revenue",
-      "kpiNetViz", "TOP 5 PROPERTIES + REST") +
+      "kpiNetViz", "TOP 5 PROPERTIES + REST", netPop) +
     kpiTile(fmtMoney(revenue.total_gross_revenue), "Gross revenue",
-      "kpiGrossViz", "GROSS VS CONCESSIONS") +
+      "kpiGrossViz", "GROSS VS CONCESSIONS", grossPop) +
     kpiTile(occupancy.pct_occ != null ? occupancy.pct_occ.toFixed(1) + "%" : "—", "Occupancy",
       "kpiOccViz", `${occupancy.total_occupied} OF ${occupancy.total_units} UNITS`) +
     kpiTile(fmtMoney(totalDelinquent), "Total delinquent",
-      "kpiDelViz", "TOP 5 BALANCES + REST") +
+      "kpiDelViz", "TOP 5 BALANCES + REST", delinquentPop) +
     kpiTile(leases.length, "Leases rolling over (60d)",
-      "kpiRollViz", `${within30} WITHIN 30D · ${leases.length - within30} IN 31-60D`);
+      "kpiRollViz", `${within30} WITHIN 30D · ${leases.length - within30} IN 31-60D`, rolloverPop);
 
   drawKpiSegments("kpiNetViz", topSegments(revenue.by_property, (p) => p.net_effective_revenue));
   drawKpiSegments("kpiGrossViz", [
@@ -203,16 +212,40 @@ function renderPortfolioKpis(revenue, occupancy, delinquent, leases, leaseRefDat
 
 function renderPropertyKpis(rev, occ, delinquent, leases) {
   const totalDelinquent = delinquent.reduce((s, r) => s + r.balance, 0);
+
+  // hover popovers carry what used to be the separate revenue/delinquent/rollover
+  // panels: full breakdown on the revenue tile, top balances on the delinquent tile,
+  // next expirations on the rollover tile
+  const revenuePop = popRows([
+    ["Gross", fmtMoney(rev.gross_revenue)],
+    ["Concessions", fmtMoneySigned(rev.concessions), "down"],
+    ["Net effective", fmtMoney(rev.net_effective_revenue), "up"],
+    ...rev.by_category.map((c) => ["&nbsp;&nbsp;" + c.category.replace("_", " "), fmtMoneySigned(c.amount)]),
+  ]);
+  const occPop = popRows([
+    ["Occupied", occ.occupied],
+    ["On notice", occ.on_notice],
+    ["Vacant", occ.vacant],
+    ["Avg rent", occ.avg_rent ? fmtMoney(occ.avg_rent) : "—"],
+    ["Avg sq ft", occ.avg_sq_ft ? Math.round(occ.avg_sq_ft) : "—"],
+  ]);
+  const delinquentPop = delinquent.length
+    ? popRows(delinquent.slice(0, 6).map((r) => [`${r.resident_name} · ${r.unit_number}`, fmtMoney(r.balance), "down"]))
+    : `<div class="pop-empty">No outstanding balances.</div>`;
+  const rolloverPop = leases.length
+    ? popRows(leases.slice(0, 6).map((l) => [`${l.unit_number} · exp ${l.lease_expiration}`, l.market_rent ? fmtMoney(l.market_rent) : "—"]))
+    : `<div class="pop-empty">Nothing expiring in this window.</div>`;
+
   document.getElementById("dashKpiStrip").innerHTML =
     kpiTile(fmtMoney(rev.net_effective_revenue), "Net effective revenue",
-      "kpiPNetViz", "NET VS CONCESSIONS") +
+      "kpiPNetViz", "NET VS CONCESSIONS · HOVER FOR BREAKDOWN", revenuePop) +
     kpiTile(occ.pct_occ != null ? occ.pct_occ.toFixed(1) + "%" : "—", "Occupancy",
-      "kpiPOccViz", `${occ.occupied} OF ${occ.total_units} UNITS`) +
+      "kpiPOccViz", `${occ.occupied} OF ${occ.total_units} UNITS`, occPop) +
     kpiTile(occ.total_units, "Units",
-      "kpiPUnitsViz", `${occ.occupied} OCC · ${occ.on_notice} NOTICE · ${occ.vacant} VACANT`) +
+      "kpiPUnitsViz", `${occ.occupied} OCC · ${occ.on_notice} NOTICE · ${occ.vacant} VACANT`, occPop) +
     kpiTile(fmtMoney(totalDelinquent), "Delinquent",
-      "kpiPDelViz", "TOP 5 BALANCES + REST") +
-    kpiTile(leases.length, "Rolling over (60d)");
+      "kpiPDelViz", "TOP 5 BALANCES + REST · HOVER FOR NAMES", delinquentPop) +
+    kpiTile(leases.length, "Rolling over (60d)", null, "HOVER FOR NEXT EXPIRATIONS", rolloverPop);
 
   drawKpiSegments("kpiPNetViz", [
     { value: rev.net_effective_revenue || 0.0001, color: "#34d399" },
@@ -294,7 +327,7 @@ function applyUnitFilters() {
 
   document.getElementById("unitsBody").innerHTML = filtered.map((u) => {
     const status = u.status || "vacant";
-    return `<tr>
+    return `<tr data-unit-id="${u.unit_id}">
       <td class="strong">${u.unit_number}</td>
       <td>${u.unit_type || "—"}</td>
       <td class="mono">${u.sq_ft ? Math.round(u.sq_ft) : "—"}</td>
@@ -310,6 +343,63 @@ function applyUnitFilters() {
 document.getElementById("unitSearch").addEventListener("input", applyUnitFilters);
 document.getElementById("unitStatusFilter").addEventListener("change", applyUnitFilters);
 document.getElementById("unitTypeFilter").addEventListener("change", applyUnitFilters);
+
+/* ── unit detail modal: click a row -> /units/{id} -> tenancy facts + real charge
+   lines. No history section on purpose (one snapshot loaded); if a billable unit has
+   zero charge lines, the modal says so explicitly instead of showing a blank. ── */
+const unitModal = document.getElementById("unitModal");
+
+function closeUnitModal() {
+  unitModal.classList.remove("open");
+  unitModal.setAttribute("aria-hidden", "true");
+}
+document.getElementById("unitModalBackdrop").addEventListener("click", closeUnitModal);
+document.getElementById("unitModalClose").addEventListener("click", closeUnitModal);
+addEventListener("keydown", (e) => { if (e.key === "Escape") closeUnitModal(); });
+
+document.getElementById("unitsBody").addEventListener("click", async (e) => {
+  const row = e.target.closest("tr[data-unit-id]");
+  if (!row) return;
+  const detail = await api(`/units/${row.dataset.unitId}`);
+  const t = detail.tenancy;
+
+  const facts = popRows([
+    ["Status", t ? t.status : "no current tenancy"],
+    ["Resident", t?.resident_name || "—"],
+    ["Program", detail.program_type],
+    ["Sq ft", detail.sq_ft ? Math.round(detail.sq_ft) : "—"],
+    ["Market rent", t?.market_rent ? fmtMoney(t.market_rent) : "—"],
+    ["Deposit", t?.resident_deposit ? fmtMoney(t.resident_deposit) : "—"],
+    ["Move in", t?.move_in || "—"],
+    ["Lease expires", t?.lease_expiration || "—"],
+    ["Move out", t?.move_out || "—"],
+    ["Balance", t?.balance ? fmtMoney(t.balance) : "$0", t?.balance > 0 ? "down" : ""],
+  ]);
+
+  let chargesHtml;
+  if (detail.charges.length) {
+    chargesHtml = popRows(detail.charges.map((c) =>
+      [`${c.charge_code} · ${c.category.replace("_", " ")}`, fmtMoneySigned(c.amount), c.amount < 0 ? "down" : ""]
+    )) + popRows([["Total", fmtMoney(detail.total_charges), "up"]]);
+  } else if (t && (t.status === "occupied" || t.status === "notice") ) {
+    chargesHtml = `<div class="unit-gap-note">No charge lines recorded for this tenancy in the
+      source file despite an active resident -- this is the missing_charges data quality gap
+      (see Anomalies on the How it's built page). Revenue for this unit is understated.</div>`;
+  } else {
+    chargesHtml = `<div class="pop-empty">No charges -- unit has no billable tenancy.</div>`;
+  }
+
+  document.getElementById("unitModalBody").innerHTML = `
+    <div class="gate-eyebrow">${detail.canonical_name} &middot; ${detail.property_id}</div>
+    <h2>Unit ${detail.unit_number}</h2>
+    <p class="mono" style="font-size:11px">${detail.unit_type || ""}</p>
+    <div class="unit-modal-grid">
+      <div><div class="unit-modal-heading">TENANCY</div>${facts}</div>
+      <div><div class="unit-modal-heading">CHARGE LINES · THIS PERIOD</div>${chargesHtml}</div>
+    </div>`;
+  unitModal.classList.add("open");
+  unitModal.setAttribute("aria-hidden", "false");
+});
 
 init().catch((err) => {
   console.error(err);

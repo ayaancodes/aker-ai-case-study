@@ -13,6 +13,17 @@
 
 <div class="cursor-glow" id="cursorGlow"></div>
 
+<!-- ───────── UNIT DETAIL MODAL — opened by clicking a row in the units table.
+     Real loaded data only: tenancy facts + actual charge lines. No history section
+     on purpose, one snapshot is loaded. ───────── -->
+<div class="modal" id="unitModal" aria-hidden="true">
+  <div class="modal-backdrop" id="unitModalBackdrop"></div>
+  <div class="modal-card modal-card-wide">
+    <button class="modal-close" id="unitModalClose" aria-label="Close">&times;</button>
+    <div id="unitModalBody"></div>
+  </div>
+</div>
+
 <nav id="nav">
   <div class="nav-in">
     <a class="logo" href="index.html">
@@ -97,41 +108,8 @@
         <span id="pId"></span>
       </div>
 
-      <!-- revenue waterfall + both risk panels in one row: no scrolling needed to see
-           the property's whole financial picture -->
-      <div class="dash-section prop-grid-3">
-        <div class="eq-panel">
-          <div class="eq-head"><div><div class="eq-title">Revenue</div></div></div>
-          <div class="eq-body">
-            <div class="waterfall waterfall-compact">
-              <div class="wf-col">
-                <div class="wf-val mono" id="wfGrossVal"></div>
-                <div class="wf-bar gross" id="wfGross" style="height:0"></div>
-                <div class="wf-label">Gross</div>
-              </div>
-              <div class="wf-col">
-                <div class="wf-val mono" id="wfConcVal"></div>
-                <div class="wf-bar concession" id="wfConc" style="height:0"></div>
-                <div class="wf-label">Concessions</div>
-              </div>
-              <div class="wf-col">
-                <div class="wf-val mono" id="wfNetVal"></div>
-                <div class="wf-bar net" id="wfNet" style="height:0"></div>
-                <div class="wf-label">Net effective</div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="eq-panel">
-          <div class="eq-head"><div><div class="eq-title">Delinquent balances</div></div></div>
-          <div class="risk-list risk-list-compact" id="pDelinquentList"></div>
-        </div>
-        <div class="eq-panel">
-          <div class="eq-head"><div><div class="eq-title">Lease rollover</div><div class="eq-sub">60 days</div></div></div>
-          <div class="risk-list risk-list-compact" id="pLeaseList"></div>
-        </div>
-      </div>
-
+      <!-- Units are the whole property view now. Revenue breakdown, delinquents and
+           rollover live in the KPI tiles' hover popovers instead of their own panels. -->
       <div class="dash-section">
         <div class="eq-panel">
           <div class="eq-head units-head">

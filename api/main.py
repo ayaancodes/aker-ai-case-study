@@ -381,6 +381,54 @@ def property_units(property_id: str, conn=Depends(get_connection)):
     return [dict(r) for r in rows]
 
 
+@app.get("/units/{unit_id}")
+def unit_detail(unit_id: int, conn=Depends(get_connection)):
+    """Full detail for one unit: dimensions, its current-section tenancy from the
+    latest snapshot (deposits and dates included -- fields the units list omits),
+    and the actual charge line items. Everything here is real loaded data; there is
+    deliberately no history section because only one snapshot is loaded."""
+    unit = conn.execute(
+        """SELECT u.unit_id, u.property_id, p.canonical_name, u.program_type,
+                  u.unit_number, u.unit_type, u.sq_ft
+           FROM units u JOIN properties p ON p.property_id = u.property_id
+           WHERE u.unit_id = ?""",
+        (unit_id,),
+    ).fetchone()
+    if unit is None:
+        raise HTTPException(status_code=404, detail=f"Unknown unit_id: {unit_id}")
+
+    tenancy = conn.execute(
+        """SELECT t.tenancy_id, t.status, t.resident_name, t.market_rent,
+                  t.resident_deposit, t.other_deposit, t.move_in, t.lease_expiration,
+                  t.move_out, t.balance
+           FROM tenancies t
+           WHERE t.unit_id = ? AND t.section = 'current'
+             AND t.snapshot_id = (
+                 SELECT s.snapshot_id FROM data_snapshots s
+                 WHERE s.property_id = ? AND s.program_type = ?
+                   AND s.source_type = 'rent_roll'
+                 ORDER BY s.as_of_date DESC LIMIT 1
+             )""",
+        (unit_id, unit["property_id"], unit["program_type"]),
+    ).fetchone()
+
+    charges = []
+    if tenancy:
+        charges = [dict(r) for r in conn.execute(
+            """SELECT c.charge_code, c.amount, cc.category, cc.description
+               FROM charges c JOIN charge_codes cc ON cc.code = c.charge_code
+               WHERE c.tenancy_id = ? ORDER BY c.amount DESC""",
+            (tenancy["tenancy_id"],),
+        ).fetchall()]
+
+    return {
+        **dict(unit),
+        "tenancy": dict(tenancy) if tenancy else None,
+        "charges": charges,
+        "total_charges": sum(c["amount"] for c in charges),
+    }
+
+
 @app.get("/loader-errors")
 def loader_errors(conn=Depends(get_connection)):
     """Unexpected (non-parse) exceptions hit during the last few loads -- almost
