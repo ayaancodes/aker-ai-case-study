@@ -44,10 +44,6 @@ function particleField(cv) {
   frame();
 }
 
-// The gate starts open (it's the first thing shown), so the hero needs to make room
-// for it immediately -- not just on some later toggle.
-document.body.classList.add("gate-open");
-
 async function init() {
   const [revenue, properties, delinquent, leases] = await Promise.all([
     api("/revenue/portfolio"),
@@ -191,10 +187,26 @@ function renderMarquee(sorted) {
   document.getElementById("mq2").innerHTML = sorted.slice(half).concat(sorted.slice(half)).map(cardHtml).join("");
 }
 
-/* ── entry gate (cosmetic only, no real auth) -- takes you to the dashboard ── */
-document.getElementById("gateEnter").addEventListener("click", () => {
-  window.location.href = "dashboard.html";
-});
+/* ── sign-in modal (cosmetic only, no real auth) -- Enter navigates to the dashboard ── */
+(function () {
+  const modal = document.getElementById("loginModal");
+  const open = () => {
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    modal.querySelector(".gate-input")?.focus();
+  };
+  const close = () => {
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
+  };
+  document.querySelectorAll("[data-open-login]").forEach((b) => b.addEventListener("click", open));
+  document.getElementById("loginBackdrop").addEventListener("click", close);
+  document.getElementById("loginClose").addEventListener("click", close);
+  addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+  document.getElementById("gateEnter").addEventListener("click", () => {
+    window.location.href = "dashboard.html";
+  });
+})();
 
 init().catch((err) => {
   console.error(err);

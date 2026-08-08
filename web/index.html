@@ -13,21 +13,22 @@
 
 <div class="cursor-glow" id="cursorGlow"></div>
 
-<!-- ───────── ENTRY GATE (cosmetic only, no real auth) — docked over the visible
-     landing page, not a full-screen takeover. "Enter" goes to the dashboard. ───────── -->
-<div class="gate" id="gate">
-  <div class="gate-form">
-    <div class="gate-form-in">
-      <div class="gate-eyebrow">PORTFOLIO TERMINAL</div>
-      <h2>Welcome back.</h2>
-      <p>Sign in to open the dashboard.</p>
-      <label class="gate-label">Email</label>
-      <input class="gate-input" type="email" placeholder="you@aker.com" autocomplete="off">
-      <label class="gate-label">Password</label>
-      <input class="gate-input" type="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="off">
-      <button class="btn btn-grad btn-lg gate-enter" id="gateEnter">Enter &rarr;</button>
-      <div class="gate-note">DEMO ACCESS &middot; NO ACCOUNT REQUIRED</div>
-    </div>
+<!-- ───────── SIGN-IN MODAL (cosmetic only, no real auth) — opens on top of the page
+     with its own backdrop, so it can't collide with the hero/ticker layout the way the
+     old docked card did. "Enter" navigates to the dashboard. ───────── -->
+<div class="modal" id="loginModal" aria-hidden="true">
+  <div class="modal-backdrop" id="loginBackdrop"></div>
+  <div class="modal-card">
+    <button class="modal-close" id="loginClose" aria-label="Close">&times;</button>
+    <div class="gate-eyebrow">PORTFOLIO TERMINAL</div>
+    <h2>Welcome back.</h2>
+    <p>Sign in to open the dashboard.</p>
+    <label class="gate-label">Email</label>
+    <input class="gate-input" type="email" placeholder="you@aker.com" autocomplete="off">
+    <label class="gate-label">Password</label>
+    <input class="gate-input" type="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="off">
+    <button class="btn btn-grad btn-lg gate-enter" id="gateEnter">Enter &rarr;</button>
+    <div class="gate-note">DEMO ACCESS &middot; NO ACCOUNT REQUIRED</div>
   </div>
 </div>
 
@@ -45,6 +46,7 @@
     </div>
     <div class="nav-cta">
       <a class="btn btn-ghost" href="/docs" target="_blank">API Docs</a>
+      <button class="btn btn-grad" data-open-login>Sign in</button>
     </div>
   </div>
 </nav>
@@ -56,6 +58,10 @@
     <div class="eyebrow"><span class="dot"></span>LIVE</div>
     <h1>Your portfolio,<br><span class="grad-text">computed live.</span></h1>
     <p class="hero-sub">No mocked numbers. Every figure below comes from the database.</p>
+    <div class="hero-ctas">
+      <button class="btn btn-grad btn-lg" data-open-login>Enter the terminal &rarr;</button>
+      <a class="btn btn-ghost btn-lg" href="#explore">Explore the data</a>
+    </div>
     <div class="hero-note"><span class="live-dot"></span><span id="asOfNote">AS OF &mdash;</span></div>
   </div>
   <div class="tape" aria-hidden="true"><div class="tape-track" id="tape"></div></div>

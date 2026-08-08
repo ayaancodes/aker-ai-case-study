@@ -30,35 +30,29 @@ section{position:relative}
 @media (hover:none){.cursor-glow{display:none}}
 
 /* ───────── ENTRY GATE ───────── */
-/* Docked over the visible landing page (not a full-screen takeover) -- the hero,
-   particle field and ticker stay visible behind/around the card. */
-.gate{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:flex-end;
-  padding:40px;pointer-events:none;transition:opacity .5s ease,visibility .5s ease}
-.gate.hidden{opacity:0;visibility:hidden}
-.gate-form{pointer-events:auto;width:100%;max-width:380px;border:1px solid var(--line);border-radius:20px;
-  background:rgba(10,11,16,.82);backdrop-filter:blur(20px);padding:36px 32px;box-shadow:0 40px 90px rgba(0,0,0,.55)}
-.gate-form-in{width:100%}
+/* ───────── SIGN-IN MODAL — overlay with its own backdrop, opened on demand. Unlike
+   the old always-visible docked card, this reserves no layout space and can't collide
+   with the hero/ticker at any viewport width: closed, it doesn't exist visually;
+   open, it sits on a dimmed backdrop above everything. ───────── */
+.modal{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;
+  padding:24px;opacity:0;visibility:hidden;transition:opacity .3s ease,visibility .3s ease}
+.modal.open{opacity:1;visibility:visible}
+.modal-backdrop{position:absolute;inset:0;background:rgba(3,4,6,.72);backdrop-filter:blur(8px)}
+.modal-card{position:relative;width:100%;max-width:400px;border:1px solid var(--line);border-radius:20px;
+  background:rgba(10,11,16,.96);padding:36px 32px;box-shadow:0 40px 90px rgba(0,0,0,.6);
+  transform:translateY(14px) scale(.98);transition:transform .3s cubic-bezier(.2,.8,.2,1)}
+.modal.open .modal-card{transform:none}
+.modal-close{position:absolute;top:14px;right:16px;width:32px;height:32px;border-radius:9px;border:none;
+  background:transparent;color:var(--faint);font-size:22px;line-height:1;cursor:pointer;transition:color .15s}
+.modal-close:hover{color:var(--ink)}
 .gate-eyebrow{font-family:'JetBrains Mono';font-size:10.5px;letter-spacing:.16em;color:var(--cyan);margin-bottom:14px}
-.gate-form-in h2{font-family:'Bricolage Grotesque';font-weight:700;font-size:28px;letter-spacing:-.02em;margin-bottom:10px}
-.gate-form-in p{color:var(--dim);font-size:13.5px;margin-bottom:24px}
+.modal-card h2{font-family:'Bricolage Grotesque';font-weight:700;font-size:28px;letter-spacing:-.02em;margin-bottom:10px}
+.modal-card p{color:var(--dim);font-size:13.5px;margin-bottom:24px}
 .gate-label{display:block;font-size:12px;color:var(--dim);margin-bottom:7px}
 .gate-input{width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--void);color:var(--ink);font-family:'Instrument Sans';font-size:14px;margin-bottom:16px}
 .gate-input:focus{outline:none;border-color:var(--cyan)}
 .gate-enter{width:100%;justify-content:center;margin-top:6px}
 .gate-note{margin-top:16px;font-family:'JetBrains Mono';font-size:9.5px;color:var(--faint);letter-spacing:.06em;text-align:center}
-@media (max-width:820px){
-  .gate{align-items:flex-end;justify-content:center;padding:20px}
-  .gate-form{max-width:none}
-}
-/* While the gate card is docked on the right, the hero content actually needs to make
-   room for it -- a floating card with no reserved layout space just runs the centered
-   headline and ticker straight through it at wide viewports. Shifts the hero-in wrap
-   and ticker left instead of narrowing them symmetrically, so the visible strip next to
-   the card is where the text actually lands. */
-@media (min-width:821px){
-  body.gate-open .hero .wrap{margin-right:440px}
-  body.gate-open .tape{margin-right:420px}
-}
 
 /* NAV */
 nav{position:fixed;top:0;left:0;right:0;z-index:50;backdrop-filter:blur(16px);background:rgba(5,5,7,.82);border-bottom:1px solid transparent;transition:border-color .3s}
@@ -87,6 +81,7 @@ nav.scrolled{border-bottom-color:var(--line)}
 @keyframes pulse{50%{opacity:.35}}
 h1{font-family:'Bricolage Grotesque';font-weight:800;font-size:clamp(52px,10vw,128px);line-height:.98;letter-spacing:-.035em;margin-bottom:20px}
 .hero-sub{max-width:520px;margin:0 auto 26px;color:var(--dim);font-size:clamp(14px,1.4vw,16px)}
+.hero-ctas{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-bottom:26px}
 .hero-note{display:inline-flex;align-items:center;gap:8px;font-family:'JetBrains Mono';font-size:11px;color:var(--faint);letter-spacing:.05em}
 .live-dot{width:6px;height:6px;border-radius:50%;background:var(--profit);box-shadow:0 0 8px var(--profit);animation:pulse 2s infinite;flex:none}
 
