@@ -58,7 +58,7 @@ CREATE TABLE units (
 -- with an actual queryable field.
 CREATE TABLE tenancies (
     tenancy_id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    snapshot_id         INTEGER NOT NULL REFERENCES data_snapshots(snapshot_id),
+    snapshot_id         INTEGER NOT NULL REFERENCES data_snapshots(snapshot_id) ON DELETE CASCADE,
     unit_id             INTEGER NOT NULL REFERENCES units(unit_id),
     section             TEXT NOT NULL CHECK (section IN ('current', 'future_applicant')),
     status              TEXT NOT NULL CHECK (status IN ('occupied', 'vacant', 'model', 'down', 'notice')),
@@ -83,7 +83,7 @@ CREATE TABLE charge_codes (
 -- One row per charge line item under a tenancy.
 CREATE TABLE charges (
     charge_id       INTEGER PRIMARY KEY AUTOINCREMENT,
-    tenancy_id      INTEGER NOT NULL REFERENCES tenancies(tenancy_id),
+    tenancy_id      INTEGER NOT NULL REFERENCES tenancies(tenancy_id) ON DELETE CASCADE,
     charge_code     TEXT NOT NULL REFERENCES charge_codes(code),
     amount          REAL NOT NULL
 );
@@ -92,7 +92,7 @@ CREATE TABLE charges (
 -- unlike tenancies/charges which require splitting the nested Rent Roll layout.
 CREATE TABLE unit_availability_snapshots (
     ua_snapshot_id      INTEGER PRIMARY KEY AUTOINCREMENT,
-    snapshot_id         INTEGER NOT NULL REFERENCES data_snapshots(snapshot_id),
+    snapshot_id         INTEGER NOT NULL REFERENCES data_snapshots(snapshot_id) ON DELETE CASCADE,
     property_id         TEXT NOT NULL REFERENCES properties(property_id),
     avg_sq_ft            REAL,
     avg_rent             REAL,
@@ -118,7 +118,7 @@ CREATE TABLE unit_availability_snapshots (
 CREATE TABLE data_quality_flags (
     flag_id         INTEGER PRIMARY KEY AUTOINCREMENT,
     property_id     TEXT REFERENCES properties(property_id),
-    snapshot_id     INTEGER REFERENCES data_snapshots(snapshot_id),
+    snapshot_id     INTEGER REFERENCES data_snapshots(snapshot_id) ON DELETE CASCADE,
     flag_type       TEXT NOT NULL,
     detail          TEXT,
     flagged_at      TEXT NOT NULL DEFAULT (datetime('now'))

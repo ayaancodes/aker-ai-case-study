@@ -1,8 +1,31 @@
 # Aker AI — Round 2 Case Study
 
 ## Status
-Schema written and validated (db/schema.sql), building the loader next, then FastAPI backend,
-then dashboard + LLM chatbot on top.
+Schema built, loader built and validated (scripts/load_data.py + scripts/etl/). Full
+25+25 file load runs clean: 4,106 tenancies, 9,177 charges, 15 properties, 4 data quality
+flags (3 empty rent rolls, 1 unit-availability mismatch), zero charge-total mismatches,
+idempotent on re-run. Building FastAPI backend next, then dashboard + LLM chatbot.
+
+## Loader architecture (scripts/etl/)
+- `filenames.py` — derives property_id/program_type from filename pattern alone (regex,
+  no hardcoded property list). Handles the altapm no-numeric-prefix case.
+- `rent_roll_parser.py` — parses one rent roll file into plain dicts, no DB code. Stops
+  at the `Summary Groups` marker row (confirmed present in all 25 files, including the
+  3 empty ones) so the footer occupancy/charge-code summary tables never get misread as
+  fake unit rows. Verified against all 25 files: 4,106 units parsed, matches the original
+  investigation exactly; 0 charge-total mismatches.
+- `unit_availability_parser.py` — parses one UA file (fixed 7-row/18-col layout, uses
+  the row-5 data row, not the row-6 duplicate "Total" row).
+- `db.py` — all SQLite writes. get_or_create for properties/units so re-running is safe;
+  delete-by-filename-then-reinsert per snapshot for idempotency (relies on ON DELETE
+  CASCADE from data_snapshots down to tenancies/charges/ua_snapshots/flags).
+- `load_data.py` — orchestrator. Globs both folders (no hardcoded file list, scales past
+  25 files by construction), loads rent rolls first then unit availability (needed for
+  the cross-check flag), one commit per file, a bad file gets logged and the run
+  continues rather than aborting everything.
+- Verified: 15 properties (corrected from an earlier "16" hand-count during investigation,
+  see edge cases), 4,106 tenancies, 9,177 charges, 4 flags (matches expected: 134land/183c/
+  altapm empty + 153c unit-availability mismatch), idempotent re-run gives identical counts.
 
 ## Build plan (decided)
 - **DB engine**: SQLite. Single file, zero setup, plenty for this data size (~4-5k rows).
@@ -26,7 +49,8 @@ then dashboard + LLM chatbot on top.
   frontend) given the Monday deadline. Render or Railway for hosting.
 
 ## Schema (locked, see db/schema.sql for the actual DDL)
-- `properties` — one row per real property (16 unique, not 25 files). PK is the numeric
+- `properties` — one row per real property (15 unique, not 25 files: 14 numbered
+  properties + `altapm`). PK is the numeric
   code prefix stripped of its program suffix (e.g. `134`, not `134c`/`134r`/`134land`).
   `altapm` has no numeric prefix at all, kept as literal property_id `altapm` (it's the
   empty placeholder property anyway, see data_quality_flags).
@@ -143,10 +167,11 @@ Deadline: Monday, August 10.
 - No genuine duplicate residents. "VACANT" (3x in `134c`) and "DOWN" (8x in `184r`) repeat as
   resident codes but they're placeholder statuses, not real people reused across units.
 - Charge-line-to-Total math checked across all 4,106 unit records: zero mismatches.
-- 25 rent roll files map to only 16 unique properties (a/c/r/land suffixes split one property
-  across multiple files). "55 Riverwalk Place" (134c, 134land) vs "Fifty-Five Riverwalk Place"
-  (134r) is the same property (code 134) with an inconsistent name across its own files —
-  match properties by code prefix, never by name string.
+- 25 rent roll files map to only 15 unique properties (a/c/r/land suffixes split one property
+  across multiple files; the loader's actual dedup gives 15, correcting an earlier hand-count
+  of 16 during initial investigation). "55 Riverwalk Place" (134c, 134land) vs "Fifty-Five
+  Riverwalk Place" (134r) is the same property (code 134) with an inconsistent name across its
+  own files — match properties by code prefix, never by name string.
 - Unit Availability structure is rock solid across all 25 files (7 rows x 18 cols, no
   deviations). Cross-checked its unit counts against independently counting Rent Roll rows:
   matches in 24 of 25. The one break: `153c` (Abbot Mill commercial) Unit Availability is
