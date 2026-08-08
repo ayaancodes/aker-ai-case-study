@@ -164,6 +164,11 @@ Deadline: Monday, August 10.
   hasn't given notice yet, and near-100% for Future Residents (haven't moved in yet).
 - 427 rows have negative balances (down to -$11,141.05, credits/large arrears), 67 rows have
   |balance| > $5,000. Real business data, not errors — balance must stay signed decimal.
+  Top positive balances are concentrated in `139c` (The Mill Greenwich, commercial): 3 units
+  there carry balances of $35,545.80 / $46,013.91 / $178,806.41, far above the largest
+  residential balance ($18,323.53 in `126r`). Worth keeping commercial and residential
+  delinquency separate in any dashboard view — a single portfolio-wide "top delinquent
+  accounts" list would be dominated by one commercial property and hide residential risk.
 - No genuine duplicate residents. "VACANT" (3x in `134c`) and "DOWN" (8x in `184r`) repeat as
   resident codes but they're placeholder statuses, not real people reused across units.
 - Charge-line-to-Total math checked across all 4,106 unit records: zero mismatches.
