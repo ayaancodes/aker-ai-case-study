@@ -35,6 +35,7 @@ def portfolio_stats(conn=Depends(get_connection)):
     mismatches = conn.execute(
         "SELECT COUNT(*) FROM data_quality_flags WHERE flag_type = 'charge_total_mismatch'"
     ).fetchone()[0]
+    loader_errors = conn.execute("SELECT COUNT(*) FROM loader_errors").fetchone()[0]
     holdover_leases = conn.execute(
         """SELECT COUNT(*) FROM tenancies
            WHERE section = 'current' AND status = 'occupied'
@@ -50,6 +51,7 @@ def portfolio_stats(conn=Depends(get_connection)):
         "charge_total_mismatches": mismatches,
         "data_quality_flags": flags,
         "holdover_leases": holdover_leases,
+        "loader_errors": loader_errors,
     }
 
 
@@ -107,12 +109,22 @@ def portfolio_revenue(conn=Depends(get_connection)):
            FROM v_effective_revenue_by_property"""
     ).fetchone()
 
+    # LEFT JOIN from properties, not the revenue view -- a property with zero recorded
+    # charges anywhere (176, 183, 184, 185: the missing_charges properties, confirmed to
+    # have zero charges across every one of their snapshots, not just most) has no row
+    # in v_effective_revenue_by_property at all, since that view is built from an inner
+    # join starting at `charges`. Querying from the view would silently drop those
+    # properties from the dashboard instead of showing them at $0 -- making the
+    # portfolio look smaller and healthier than it is, which is the opposite of this
+    # project's whole point. COALESCE keeps the numeric fields real zeros, not null.
     by_property = conn.execute(
-        """SELECT v.property_id, p.canonical_name, v.gross_revenue, v.concessions,
-                  v.net_effective_revenue
-           FROM v_effective_revenue_by_property v
-           JOIN properties p ON p.property_id = v.property_id
-           ORDER BY v.net_effective_revenue DESC"""
+        """SELECT p.property_id, p.canonical_name,
+                  COALESCE(v.gross_revenue, 0) AS gross_revenue,
+                  COALESCE(v.concessions, 0) AS concessions,
+                  COALESCE(v.net_effective_revenue, 0) AS net_effective_revenue
+           FROM properties p
+           LEFT JOIN v_effective_revenue_by_property v ON v.property_id = p.property_id
+           ORDER BY net_effective_revenue DESC"""
     ).fetchall()
 
     by_category = conn.execute(
@@ -144,12 +156,11 @@ def property_revenue(property_id: str, conn=Depends(get_connection)):
            FROM v_effective_revenue_by_property WHERE property_id = ?""",
         (property_id,),
     ).fetchone()
-    if effective is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No charge data loaded for property_id: {property_id}",
-        )
 
+    # A real property (exists in `properties`) with zero recorded charges anywhere is a
+    # data quality problem (see /anomalies), not a 404 -- 404 here would mean "this
+    # property doesn't exist," which is false. Return honest zeros instead, same fix
+    # as /revenue/portfolio.
     by_category = conn.execute(
         """SELECT category, total_amount AS amount
            FROM v_revenue_by_property_category
@@ -161,10 +172,10 @@ def property_revenue(property_id: str, conn=Depends(get_connection)):
     return {
         "property_id": property_id,
         "canonical_name": prop["canonical_name"],
-        "as_of_date": effective["as_of_date"],
-        "gross_revenue": effective["gross_revenue"],
-        "concessions": effective["concessions"],
-        "net_effective_revenue": effective["net_effective_revenue"],
+        "as_of_date": effective["as_of_date"] if effective else None,
+        "gross_revenue": effective["gross_revenue"] if effective else 0,
+        "concessions": effective["concessions"] if effective else 0,
+        "net_effective_revenue": effective["net_effective_revenue"] if effective else 0,
         "by_category": [dict(r) for r in by_category],
     }
 
@@ -218,7 +229,7 @@ def delinquent_tenancies(
 
 @app.get("/anomalies")
 def anomalies(property_id: Optional[str] = None, conn=Depends(get_connection)):
-    query = """SELECT flag_id, property_id, snapshot_id, flag_type, detail, flagged_at
+    query = """SELECT flag_id, property_id, snapshot_id, flag_type, detail, pct_value, flagged_at
                FROM data_quality_flags"""
     params = []
     if property_id:
@@ -227,6 +238,19 @@ def anomalies(property_id: Optional[str] = None, conn=Depends(get_connection)):
     query += " ORDER BY flagged_at DESC"
 
     rows = conn.execute(query, params).fetchall()
+    return [dict(r) for r in rows]
+
+
+@app.get("/loader-errors")
+def loader_errors(conn=Depends(get_connection)):
+    """Unexpected (non-parse) exceptions hit during the last few loads -- almost
+    certainly a bug in the loader itself, not a source data problem. Kept separate from
+    /anomalies since those two failure classes shouldn't be conflated (see loader_errors
+    table comment in db/schema.sql)."""
+    rows = conn.execute(
+        """SELECT error_id, source_filename, error_type, error_detail, occurred_at
+           FROM loader_errors ORDER BY occurred_at DESC"""
+    ).fetchall()
     return [dict(r) for r in rows]
 
 

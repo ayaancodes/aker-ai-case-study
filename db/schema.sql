@@ -4,7 +4,7 @@
 
 PRAGMA foreign_keys = ON;
 
--- One row per real property (16 unique, not 25 source files).
+-- One row per real property (15 unique, not 25 source files).
 -- PK is the numeric code prefix pulled from the filename/in-file code, not the name string,
 -- since property names are spelled inconsistently across a property's own files
 -- (e.g. "55 Riverwalk Place" vs "Fifty-Five Riverwalk Place", both code 134).
@@ -115,13 +115,35 @@ CREATE TABLE unit_availability_snapshots (
 -- Data quality issues computed at load time (e.g. 153c's broken Unit Availability snapshot,
 -- altapm being an empty placeholder property). Stored as real rows so this becomes a live
 -- feature the chatbot can query, not just tribal knowledge.
+-- pct_value holds the underlying numeric ratio for flags that are fundamentally a
+-- percentage (e.g. missing_charges coverage gap), not just a boolean. Added after an
+-- audit found the original >50%-threshold missing_charges check gave zero signal for a
+-- property with, say, 35% of charges missing -- always computing and storing the real
+-- number means a partial gap is visible in /anomalies even when it doesn't clear the
+-- "severe" bar that triggers the flag_type distinction below.
 CREATE TABLE data_quality_flags (
     flag_id         INTEGER PRIMARY KEY AUTOINCREMENT,
     property_id     TEXT REFERENCES properties(property_id),
     snapshot_id     INTEGER REFERENCES data_snapshots(snapshot_id) ON DELETE CASCADE,
     flag_type       TEXT NOT NULL,
     detail          TEXT,
+    pct_value       REAL,
     flagged_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Unexpected errors raised while loading a file (i.e. NOT a recognized parse error like
+-- a malformed header or a missing summary marker). These are almost certainly a bug in
+-- the loader itself, not a bad source file, and get their own table so they're never
+-- silently indistinguishable from a normal "this file's data looks wrong" failure --
+-- an audit found the loader previously caught every exception the same way and only
+-- printed it to stdout in the final run summary, meaning a real code bug in an
+-- unattended run would leave no trace in the database at all.
+CREATE TABLE loader_errors (
+    error_id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_filename TEXT NOT NULL,
+    error_type      TEXT NOT NULL,
+    error_detail    TEXT,
+    occurred_at     TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE INDEX idx_tenancies_snapshot ON tenancies(snapshot_id);

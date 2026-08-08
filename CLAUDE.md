@@ -8,8 +8,10 @@ Deadline: Monday, August 10.
 
 ## Status
 Data investigated, schema built, loader built and validated, FastAPI backend built and
-validated. Every layer has been run against the real data and checked, not just written
-and assumed correct. Next: dashboard + LLM chatbot (not started).
+validated, dashboard built (still being iterated on visually). An independent audit pass
+found and fixed real validation gaps in the loader (section 6) — fixes were cross-checked
+against the raw Excel files with a second, differently-written parser, not just against
+the database's own internal consistency. Next: finish dashboard polish, then LLM chatbot.
 
 ## How this file is organized
 Each numbered section below is one phase of the build, in the order it actually happened.
@@ -319,6 +321,99 @@ Place alias, `altapm` correctly 404s on `/revenue` since it has no charge data).
   is done early.
 - **Deployment**: keep it to one deployable service if possible (FastAPI serving API +
   frontend) given the Monday deadline. Render or Railway for hosting.
+
+---
+
+## 6. Audit: idempotency, validation coverage, and error-handling fixes
+
+**Goal:** an outside audit (prompted by the missing_charges discovery) was asked to check
+this pipeline against real ETL practice, not just internal consistency, and to fix what
+it found rather than just report it.
+
+**Approach:** for each gap, re-verify it's real against the live data first, fix the
+narrowest correct thing, then re-run the full loader from scratch and independently
+cross-check the result against the raw Excel files with a second, differently-written
+parsing path — not just against the database's own internal consistency.
+
+### Result: what the audit found and fixed
+- **The missing_charges check had the same blind spot it was built to catch, for
+  'notice' status tenants.** It only checked `status == 'occupied'`; 147 'notice' status
+  tenancies (giving notice, still paying) carry real market rent, and 33 of them (22%)
+  had the identical zero-charges problem, invisible to the flag. All 33 were inside the
+  5 already-flagged properties, so the flag's own reported counts were undercounting
+  even where it had already caught the issue (176's flag said "277 of 277," missing 15
+  more). Fixed: `CHARGE_EXPECTED_STATUSES` now covers occupied + notice. `model`/`down`
+  were deliberately checked and excluded — they carry real market_rent (avg
+  $1,868-$2,652) but resident_name is a generic "Resident N" placeholder, not a real
+  tenant, so zero charges there is correct, not a gap.
+- **The 50%-threshold flag was a boolean with no visibility below the cliff.** A
+  property with, say, 35% of charges missing would load clean with zero signal. Fixed:
+  added `pct_value` to `data_quality_flags`, always computed and stored whenever
+  nonzero. `flag_type` still distinguishes severe (`missing_charges`, >50%) from
+  partial (`missing_charges_partial`, any nonzero amount below that), but the number is
+  never hidden. Property `144` (1 of 759 tenancies, 0.1%) is the first
+  `missing_charges_partial` case, exactly the kind of gap the old boolean would have
+  silently passed.
+- **Idempotency didn't handle a renamed or removed source file.**
+  `delete_existing_snapshot` matched by exact filename; a rename left the old row as an
+  orphan sharing the new row's as_of_date, which the revenue views would then silently
+  sum together — reintroducing the double-counting bug already fixed once. Fixed:
+  matching is now by identity (`property_id`, `program_type`, `source_type`,
+  `as_of_date`), with a filename fallback only when `as_of_date` couldn't be parsed. A
+  new end-of-run reconciliation pass (`reconcile_missing_files`) removes snapshots for
+  files no longer present in the source folder at all, which identity-matching alone
+  can't catch since it only fires on reprocessing. Verified with a scratch test: renamed
+  one file and removed another mid-run, confirmed no orphan and no double-counted
+  revenue in `v_effective_revenue_by_property`.
+- **Two different definitions of "latest snapshot" existed.** The SQL views used
+  `MAX(as_of_date)`; the loader's own Unit-Availability-vs-Rent-Roll cross-check used
+  `loaded_at DESC`. They only agreed by coincidence with one snapshot per property/
+  program. Fixed: `latest_rent_roll_snapshot` now orders by `as_of_date DESC` too,
+  `loaded_at` only as a tiebreaker.
+- **Exception handling couldn't tell a bad file from a loader bug.**
+  `except (RentRollParseError, Exception)` was functionally `except Exception` —
+  a genuine code bug and a malformed source file were handled identically and only ever
+  printed to stdout. Fixed: known parse errors stay a normal per-file failure; anything
+  else is now written to a new `loader_errors` table (new `/loader-errors` API
+  endpoint), so a loader bug can never be mistaken for "the source file was just bad"
+  after the fact.
+- **`units` was first-write-wins forever.** A later file correcting `sq_ft` or
+  `unit_type` was silently ignored. Fixed: `get_or_create_unit` now updates on change
+  and logs a `unit_dimension_changed` flag, so a correction is both applied and
+  auditable.
+- **`db/schema.sql`'s own property-count comment was stale** ("16 unique"), corrected to 15.
+- **No automated tests existed.** Added `tests/` (36 tests): idempotency/rename/
+  reconciliation logic, unit-dimension updates, the exact known-good counts (15
+  properties, 4,106 tenancies, 9,177 charges, 32 charge codes, zero charge-total
+  mismatches), and regression coverage for all three previously-found-and-fixed bugs
+  (as_of_date ISO format, leases/expiring bounded on both ends, missing_charges'
+  notice-status coverage).
+
+### Result: verified against the real data, and independently against the raw files
+- Full reload from scratch (`rm -f db/aker.db && python3 scripts/load_data.py`):
+  25/25 + 25/25 files, 15 properties, 4,106 tenancies, 9,177 charges unchanged (these
+  fixes are validation-layer, not parsing-layer). Flags grew from 10 to 11 (the new
+  `missing_charges_partial` case). Zero `loader_errors`. Idempotent re-run confirmed:
+  identical counts on a second pass — re-verified independently, not just taken on the
+  audit's word.
+- **Cross-validated independently against the raw Excel files**, not just the
+  database's internal consistency: a standalone pandas script using a *different*
+  parsing strategy (vectorized block-segmentation instead of the loader's row-by-row
+  state machine) recomputed total market rent, total recorded charges, billable-tenancy
+  count, and missing-charges count directly from the source `.xlsx` files for all 5
+  affected properties (175, 176, 183, 184, 185). Every number matched the database
+  exactly. This also produced a corrected, exactly-reproducible figure for Kinwood
+  (175): **$787,568** in market rent at risk (373 of 375 billable tenancies missing
+  charges) — supersedes the rougher "$823k" estimate in section 1, which predated the
+  notice-status fix and wasn't independently reproducible.
+- Portfolio-wide, the missing_charges gap now accounts for **$2,045,964/month** in
+  market rent with zero recorded charges, across the properties/programs affected.
+- Separately, while iterating on the dashboard: `/revenue/portfolio` and
+  `/revenue/{property_id}` were also fixed to `LEFT JOIN`/`COALESCE` instead of inner
+  join, so a property with zero charges anywhere (176, 183, 184, 185, and the
+  structurally-empty `altapm`) shows as a real $0 on the dashboard instead of silently
+  disappearing from the list — the same "don't hide the gap" principle as the
+  `pct_value` fix above, just caught from the frontend side instead of the loader side.
 
 ---
 

@@ -34,3 +34,4 @@ ENV/
 
 # Raw data (resident/financial info, keep local only)
 Aker Case Study Data/
+pytest_cache
