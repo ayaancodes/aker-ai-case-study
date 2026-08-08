@@ -7,7 +7,7 @@ Run: uvicorn api.main:app --reload
 """
 
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles

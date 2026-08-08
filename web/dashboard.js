@@ -1,6 +1,8 @@
-let ALL_PROPERTIES = [];
-let PORTFOLIO_REVENUE = null;
 let CURRENT_PROPERTY_ID = null; // null = portfolio view
+// Portfolio-wide data fetched once at load and reused when returning from a property
+// view -- it's a single-snapshot database, nothing changes between clicks, so
+// re-fetching three endpoints on every back-click was pure waste.
+let PORTFOLIO = null;
 
 async function init() {
   const [revenue, properties, occupancy, concentration, delinquent, leases] = await Promise.all([
@@ -12,8 +14,7 @@ async function init() {
     api("/leases/expiring?days=60"),
   ]);
 
-  ALL_PROPERTIES = properties;
-  PORTFOLIO_REVENUE = revenue;
+  PORTFOLIO = { revenue, properties, occupancy, delinquent, leases: leases.leases };
   const sortedByRevenue = [...revenue.by_property].sort((a, b) => b.net_effective_revenue - a.net_effective_revenue);
 
   renderSidebar(sortedByRevenue);
@@ -62,15 +63,16 @@ function renderSidebar(sorted, query = "") {
   });
 }
 
+function sortedPortfolio() {
+  return [...PORTFOLIO.revenue.by_property].sort((a, b) => b.net_effective_revenue - a.net_effective_revenue);
+}
+
 function showPortfolioView() {
   CURRENT_PROPERTY_ID = null;
   document.getElementById("dashPortfolioView").style.display = "";
   document.getElementById("dashPropertyView").style.display = "none";
-  const sorted = [...PORTFOLIO_REVENUE.by_property].sort((a, b) => b.net_effective_revenue - a.net_effective_revenue);
-  renderSidebar(sorted, document.getElementById("dashSearch").value);
-  api("/occupancy/portfolio").then((occ) => api("/delinquent").then((d) => api("/leases/expiring?days=60").then((l) =>
-    renderPortfolioKpis(PORTFOLIO_REVENUE, occ, d, l.leases)
-  )));
+  renderSidebar(sortedPortfolio(), document.getElementById("dashSearch").value);
+  renderPortfolioKpis(PORTFOLIO.revenue, PORTFOLIO.occupancy, PORTFOLIO.delinquent, PORTFOLIO.leases);
 }
 
 async function showPropertyView(propertyId) {
@@ -78,8 +80,7 @@ async function showPropertyView(propertyId) {
   document.getElementById("dashPortfolioView").style.display = "none";
   document.getElementById("dashPropertyView").style.display = "";
 
-  const sorted = [...PORTFOLIO_REVENUE.by_property].sort((a, b) => b.net_effective_revenue - a.net_effective_revenue);
-  renderSidebar(sorted, document.getElementById("dashSearch").value);
+  renderSidebar(sortedPortfolio(), document.getElementById("dashSearch").value);
 
   const [rev, occ, delinquent, leases, units] = await Promise.all([
     api(`/revenue/${propertyId}`),
@@ -164,8 +165,6 @@ function renderConcentration(rows) {
   renderDonutLegend(document.getElementById("concLegend"), rows, "program_type");
 }
 
-const UNIT_STATUS_LABELS = { occupied: "occupied", notice: "notice", vacant: "vacant", model: "model", down: "down" };
-
 function renderUnitsTable(units) {
   document.getElementById("unitsCount").textContent = `${units.length} units`;
   document.getElementById("unitsBody").innerHTML = units.map((u) => {
@@ -174,7 +173,7 @@ function renderUnitsTable(units) {
       <td class="strong">${u.unit_number}</td>
       <td>${u.unit_type || "—"}</td>
       <td class="mono">${u.sq_ft ? Math.round(u.sq_ft) : "—"}</td>
-      <td><span class="units-status ${status}">${UNIT_STATUS_LABELS[status] || status}</span></td>
+      <td><span class="units-status ${status}">${status}</span></td>
       <td>${u.resident_name || "—"}</td>
       <td class="mono">${u.market_rent ? fmtMoney(u.market_rent) : "—"}</td>
       <td class="mono">${u.balance ? fmtMoney(u.balance) : "—"}</td>

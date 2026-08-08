@@ -63,14 +63,14 @@ function observeReveals() {
 }
 
 /* ── count-up numbers ── */
-function countUp(el, target, suffix = "") {
-  if (REDUCED || document.hidden) { el.textContent = target.toLocaleString() + suffix; return; }
+function countUp(el, target) {
+  if (REDUCED || document.hidden) { el.textContent = target.toLocaleString(); return; }
   const start = performance.now();
   const dur = 900;
   function frame(t) {
     const p = Math.min(1, (t - start) / dur);
     const eased = 1 - Math.pow(1 - p, 3);
-    el.textContent = Math.round(target * eased).toLocaleString() + suffix;
+    el.textContent = Math.round(target * eased).toLocaleString();
     if (p < 1) requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
@@ -79,7 +79,7 @@ const countObserver = new IntersectionObserver((entries) => {
   entries.forEach((e) => {
     if (e.isIntersecting && !e.target.dataset.done) {
       e.target.dataset.done = "1";
-      countUp(e.target, +e.target.dataset.count, e.target.dataset.suffix || "");
+      countUp(e.target, +e.target.dataset.count);
     }
   });
 }, { threshold: 0.4 });
