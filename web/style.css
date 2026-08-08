@@ -77,9 +77,6 @@ nav.scrolled{border-bottom-color:var(--line)}
 /* ───────── HERO — big type over a live canvas chart ───────── */
 .hero{min-height:92vh;display:flex;flex-direction:column;justify-content:center;padding-top:100px;overflow:hidden}
 #heroField{position:absolute;inset:0;width:100%;height:100%;opacity:.85;z-index:0}
-#heroChart{position:absolute;inset:0;width:100%;height:100%;opacity:.55;z-index:1;
-  mask-image:radial-gradient(ellipse 85% 70% at 50% 40%,black 30%,transparent 100%);
-  -webkit-mask-image:radial-gradient(ellipse 85% 70% at 50% 40%,black 30%,transparent 100%)}
 .hero-in{position:relative;z-index:2;text-align:center}
 .eyebrow{display:inline-flex;align-items:center;gap:9px;font-family:'JetBrains Mono';font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan);border:1px solid rgba(255,255,255,.12);background:rgba(5,5,7,.55);backdrop-filter:blur(6px);padding:7px 16px;border-radius:99px;margin-bottom:26px}
 .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--profit);box-shadow:0 0 10px var(--profit);animation:pulse 2s infinite}

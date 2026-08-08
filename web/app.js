@@ -1,120 +1,4 @@
-const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
-const fmtMoney = (n) => "$" + Math.round(n).toLocaleString("en-US");
-const fmtMoneySigned = (n) => (n < 0 ? "-" : "") + fmtMoney(Math.abs(n));
-
-/* ── cursor-follow spotlight ── */
-(function () {
-  if (REDUCED || matchMedia("(hover:none)").matches) return;
-  const glow = document.getElementById("cursorGlow");
-  addEventListener("mousemove", (e) => {
-    glow.classList.add("on");
-    glow.style.transform = `translate(${e.clientX}px, ${e.clientY}px) translate(-50%,-50%)`;
-  });
-  addEventListener("mouseleave", () => glow.classList.remove("on"));
-})();
-
-/* ── magnetic buttons ── */
-function applyMagnetic(el) {
-  if (REDUCED || matchMedia("(hover:none)").matches) return;
-  el.addEventListener("mousemove", (e) => {
-    const r = el.getBoundingClientRect();
-    const dx = (e.clientX - r.left - r.width / 2) / r.width;
-    const dy = (e.clientY - r.top - r.height / 2) / r.height;
-    el.style.transform = `translate(${dx * 7}px,${dy * 5}px)`;
-  });
-  el.addEventListener("mouseleave", () => { el.style.transform = ""; });
-}
-document.querySelectorAll(".btn-grad").forEach(applyMagnetic);
-
-/* ── nav scroll shadow ── */
-const nav = document.getElementById("nav");
-addEventListener("scroll", () => nav.classList.toggle("scrolled", scrollY > 30), { passive: true });
-
-/* ── side rail scrollspy ── */
-(function () {
-  const rail = document.getElementById("rail");
-  if (!rail) return;
-  const links = [...rail.querySelectorAll("a")];
-  const ids = links.map((a) => a.dataset.rail);
-  const io = new IntersectionObserver((entries) => {
-    entries.forEach((e) => {
-      if (!e.isIntersecting) return;
-      const id = e.target.id || "top";
-      links.forEach((a) => a.classList.toggle("on", a.dataset.rail === id));
-    });
-  }, { rootMargin: "-40% 0px -55% 0px" });
-  ids.forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) io.observe(el);
-  });
-})();
-
-/* ── reveal-on-scroll ── */
-const revealObserver = new IntersectionObserver(
-  (entries) => entries.forEach((e) => e.isIntersecting && e.target.classList.add("in")),
-  { threshold: 0.15 }
-);
-function observeReveals() {
-  document.querySelectorAll(".reveal:not(.in)").forEach((el) => revealObserver.observe(el));
-}
-
-/* ── count-up numbers ── */
-function countUp(el, target, suffix = "") {
-  if (REDUCED || document.hidden) { el.textContent = target.toLocaleString() + suffix; return; }
-  const start = performance.now();
-  const dur = 900;
-  function frame(t) {
-    const p = Math.min(1, (t - start) / dur);
-    const eased = 1 - Math.pow(1 - p, 3);
-    el.textContent = Math.round(target * eased).toLocaleString() + suffix;
-    if (p < 1) requestAnimationFrame(frame);
-  }
-  requestAnimationFrame(frame);
-}
-const countObserver = new IntersectionObserver((entries) => {
-  entries.forEach((e) => {
-    if (e.isIntersecting && !e.target.dataset.done) {
-      e.target.dataset.done = "1";
-      countUp(e.target, +e.target.dataset.count, e.target.dataset.suffix || "");
-    }
-  });
-}, { threshold: 0.4 });
-
-/* ── canvas helpers ── */
-function fitCanvas(cv) {
-  const dpr = Math.min(devicePixelRatio || 1, 2);
-  const w = cv.clientWidth, h = cv.clientHeight;
-  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
-    cv.width = Math.round(w * dpr);
-    cv.height = Math.round(h * dpr);
-  }
-  const ctx = cv.getContext("2d");
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { ctx, w, h };
-}
-
-/* runs `draw(progress)` eased from 0 to 1 once `cv` scrolls into view, so charts draw
-   in instead of just appearing already-rendered. Fires once per element. */
-function animateOnceVisible(cv, draw) {
-  if (REDUCED) { draw(1); return; }
-  let done = false;
-  const io = new IntersectionObserver((entries) => {
-    if (!entries[0].isIntersecting || done) return;
-    done = true;
-    io.disconnect();
-    const start = performance.now();
-    const dur = 700;
-    function frame(t) {
-      const p = Math.min(1, (t - start) / dur);
-      draw(1 - Math.pow(1 - p, 3));
-      if (p < 1) requestAnimationFrame(frame);
-    }
-    requestAnimationFrame(frame);
-  }, { threshold: 0.2 });
-  io.observe(cv);
-}
-
-/* ── ambient bar visual, used for both the hero and the gate canvas ── */
+/* ── ambient bar visual, used for the gate's canvas ── */
 function ambientBars(cv, values, opts = {}) {
   const color = opts.color || "111,210,255";
   let t = 0, visible = true;
@@ -148,10 +32,10 @@ function ambientBars(cv, values, opts = {}) {
 }
 
 /* ── perspective particle field, adapted from Vega's hero background (2D canvas
-   version, permission granted to reuse/adapt) -- purely atmospheric motion behind
-   the real revenue bars, not tied to data itself. ── */
+   version, permission granted to reuse/adapt) -- purely atmospheric motion, the
+   only visual in the hero besides the headline itself. ── */
 function particleField(cv) {
-  if (REDUCED) return;
+  if (REDUCED || !cv) return;
   const ctx = cv.getContext("2d");
   const COLS = 70, ROWS = 26;
   let t = 0, visible = true;
@@ -200,8 +84,6 @@ function drawRevenueChart(cv, tipEl, data, progress = 1) {
   const { ctx, w, h } = fitCanvas(cv);
   ctx.clearRect(0, 0, w, h);
   const max = Math.max(...data.map((d) => d.net_effective_revenue));
-  // labelW/amtW scale down on narrow canvases (mobile) instead of being fixed --
-  // fixed widths left literally negative space for the bar itself below ~420px wide.
   const narrow = w < 420;
   const labelW = narrow ? Math.round(w * 0.34) : 190;
   const amtW = narrow ? Math.round(w * 0.22) : 100;
@@ -301,36 +183,23 @@ function renderDonutLegend(legendEl, byCategory) {
   `).join("");
 }
 
-/* ── API fetch helpers ── */
-async function api(path) {
-  const res = await fetch(path);
-  if (!res.ok) throw new Error(`${path} -> ${res.status}`);
-  return res.json();
-}
-
 async function init() {
-  const [stats, revenue, properties, anomalies, delinquent, leases] = await Promise.all([
-    api("/stats"),
+  const [revenue, properties, delinquent, leases] = await Promise.all([
     api("/revenue/portfolio"),
     api("/properties"),
-    api("/anomalies"),
     api("/delinquent"),
     api("/leases/expiring?days=60"),
   ]);
 
   const sortedByRevenue = [...revenue.by_property].sort((a, b) => b.net_effective_revenue - a.net_effective_revenue);
 
-  renderStats(stats);
   renderTicker(sortedByRevenue);
-  renderHeroChart(sortedByRevenue);
   particleField(document.getElementById("heroField"));
   renderGate(sortedByRevenue, revenue.total_net_effective_revenue);
-  renderTerminal();
   initExplorer(properties, sortedByRevenue);
   renderRevenueChart(revenue, sortedByRevenue);
   renderDonut(revenue.by_category);
   renderMarquee(sortedByRevenue);
-  renderAnomalies(anomalies);
   renderDelinquent(delinquent);
   renderLeases(leases.leases);
 
@@ -340,17 +209,8 @@ async function init() {
 
   observeReveals();
   window.addEventListener("resize", () => {
-    renderHeroChart(sortedByRevenue);
     drawRevenueChart(document.getElementById("revenueChart"), document.getElementById("revenueTip"), sortedByRevenue, 1);
     drawDonut(document.getElementById("donutChart"), revenue.by_category, 1);
-  });
-}
-
-function renderStats(stats) {
-  const tiles = [stats.charge_total_mismatches, stats.properties, stats.tenancies, stats.data_quality_flags];
-  document.querySelectorAll(".stats .v").forEach((el, i) => {
-    el.dataset.count = tiles[i];
-    countObserver.observe(el);
   });
 }
 
@@ -365,11 +225,6 @@ function renderTicker(sorted) {
       <span class="px mono">${fmtMoney(p.net_effective_revenue)}</span>
     </span>`;
   }).join("");
-}
-
-function renderHeroChart(sorted) {
-  const cv = document.getElementById("heroChart");
-  ambientBars(cv, sorted.map((p) => p.net_effective_revenue), { color: "111,210,255" });
 }
 
 function renderGate(sorted, totalRevenue) {
@@ -393,31 +248,6 @@ function renderDonut(byCategory) {
   const cv = document.getElementById("donutChart");
   animateOnceVisible(cv, (progress) => drawDonut(cv, byCategory, progress));
   renderDonutLegend(document.getElementById("donutLegend"), byCategory);
-}
-
-/* ── test suite terminal — real output from `pytest tests/ -v`, a curated subset of
-   the 36 tests, not fabricated. Line-by-line reveal, triggers once scrolled into view. ── */
-const TEST_LINES = [
-  { cmd: true, text: "$ pytest tests/ -v" },
-  { text: "test_zero_charge_total_mismatches ................ " },
-  { text: "test_missing_charges_check_covers_notice_status .. " },
-  { text: "test_rename_replaces_old_snapshot_not_orphans_it . " },
-  { text: "test_leases_expiring_window_bounded_on_both_ends . " },
-  { text: "test_no_orphaned_rows_or_fk_violations ............ " },
-  { text: "test_known_missing_charges_properties_flagged_severe " },
-  { summary: true, text: "──────── 36 passed in 0.91s ────────" },
-];
-function renderTerminal() {
-  const body = document.getElementById("termBody");
-  animateOnceVisible(body, (progress) => {
-    const shown = Math.floor(progress * TEST_LINES.length);
-    body.innerHTML = TEST_LINES.map((l, i) => {
-      if (i >= shown) return "";
-      if (l.cmd) return `<div class="term-line shown term-cmd">${l.text}</div>`;
-      if (l.summary) return `<div class="term-line shown term-summary">${l.text}</div>`;
-      return `<div class="term-line shown">${l.text}<span class="term-pass">PASSED</span></div>`;
-    }).join("") + (shown < TEST_LINES.length ? `<span class="term-caret"></span>` : "");
-  });
 }
 
 /* ── property explorer — search, revenue waterfall, portfolio-rank comparison.
@@ -501,32 +331,6 @@ function renderMarquee(sorted) {
   const half = Math.ceil(sorted.length / 2);
   document.getElementById("mq1").innerHTML = sorted.slice(0, half).concat(sorted.slice(0, half)).map(cardHtml).join("");
   document.getElementById("mq2").innerHTML = sorted.slice(half).concat(sorted.slice(half)).map(cardHtml).join("");
-}
-
-const FLAG_LABELS = {
-  empty_rent_roll: "Empty rent roll",
-  unit_availability_mismatch: "Unit availability mismatch",
-  charge_total_mismatch: "Charge total mismatch",
-  missing_charges: "Missing charges",
-  missing_charges_partial: "Missing charges (partial)",
-  unit_dimension_changed: "Unit dimension changed",
-};
-
-function renderAnomalies(anomalies) {
-  const list = document.getElementById("anomalyList");
-  if (!anomalies.length) {
-    list.innerHTML = `<div class="anomaly-item">No anomalies flagged.</div>`;
-    return;
-  }
-  list.innerHTML = anomalies.map((a) => `
-    <div class="anomaly-item">
-      <span class="anomaly-ic"><svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg></span>
-      <div class="anomaly-body">
-        <div class="type">${FLAG_LABELS[a.flag_type] || a.flag_type} &middot; ${a.property_id}</div>
-        <div class="detail">${a.detail}</div>
-      </div>
-    </div>
-  `).join("");
 }
 
 function renderDelinquent(rows) {

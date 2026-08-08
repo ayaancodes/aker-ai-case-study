@@ -13,18 +13,6 @@
 
 <div class="cursor-glow" id="cursorGlow"></div>
 
-<nav class="rail" id="rail">
-  <a href="#top" data-rail="top">01 OVERVIEW</a>
-  <a href="#stats" data-rail="stats">02 DATA QUALITY</a>
-  <a href="#loop" data-rail="loop">03 PIPELINE</a>
-  <a href="#tests" data-rail="tests">04 TEST SUITE</a>
-  <a href="#explore" data-rail="explore">05 EXPLORE</a>
-  <a href="#revenue" data-rail="revenue">06 REVENUE</a>
-  <a href="#risk" data-rail="risk">07 RISK</a>
-  <a href="#library" data-rail="library">08 PORTFOLIO</a>
-  <a href="#anomalies" data-rail="anomalies">09 ANOMALIES</a>
-</nav>
-
 <!-- ───────── ENTRY GATE (cosmetic only, no real auth) ───────── -->
 <div class="gate" id="gate">
   <div class="gate-visual">
@@ -61,7 +49,7 @@
       <span class="logo-name">Aker <em>Terminal</em></span>
     </a>
     <div class="nav-links links">
-      <a href="#stats">Data Quality</a>
+      <a href="#explore">Explore</a>
       <a href="#revenue">Revenue</a>
       <a href="#risk">Risk</a>
       <a href="#library">Portfolio</a>
@@ -72,10 +60,9 @@
   </div>
 </nav>
 
-<!-- ───────── HERO — big type over a real live chart, not stacked below it ───────── -->
+<!-- ───────── HERO — big type over a moving field, nothing else competing with it ───────── -->
 <section class="hero" id="top">
   <canvas id="heroField"></canvas>
-  <canvas id="heroChart"></canvas>
   <div class="wrap hero-in">
     <div class="eyebrow"><span class="dot"></span>LIVE</div>
     <h1>Your portfolio,<br><span class="grad-text">computed live.</span></h1>
@@ -83,92 +70,6 @@
     <div class="hero-note"><span class="live-dot"></span><span id="asOfNote">AS OF &mdash;</span></div>
   </div>
   <div class="tape" aria-hidden="true"><div class="tape-track" id="tape"></div></div>
-</section>
-
-<section class="stats" id="stats">
-  <div class="wrap">
-    <div class="sec-head reveal">
-      <h2>Data Quality</h2>
-    </div>
-    <div class="stats-grid reveal stagger" id="statsGrid">
-      <div class="stat"><div class="v mono" data-count="0">0</div><div class="k">Charge-total mismatches</div></div>
-      <div class="stat"><div class="v mono" data-count="0">0</div><div class="k">Properties, deduped from 25 files</div></div>
-      <div class="stat"><div class="v mono" data-count="0">0</div><div class="k">Tenancy records loaded</div></div>
-      <div class="stat"><div class="v mono" data-count="0">0</div><div class="k">Data quality flags caught</div></div>
-    </div>
-  </div>
-</section>
-
-<section class="pillars">
-  <div class="orb orb-c" style="width:380px;height:380px;top:0;right:-120px"></div>
-  <div class="wrap">
-    <div class="sec-head reveal">
-      <h2>Architecture</h2>
-    </div>
-    <div class="pillar-grid">
-      <div class="pillar reveal"><span class="corner-orb"></span>
-        <div class="icon-wrap"><div class="icon-in"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4.5"/></svg></div></div>
-        <h3>Data quality, enforced</h3>
-        <div class="tagline">FLAGGED AT LOAD TIME</div>
-      </div>
-      <div class="pillar reveal" style="transition-delay:.08s"><span class="corner-orb"></span>
-        <div class="icon-wrap"><div class="icon-in"><svg viewBox="0 0 24 24"><path d="M2 20h20M5 20V9m5 11V4m5 16v-8m5 8V7"/></svg></div></div>
-        <h3>Snapshot-based history</h3>
-        <div class="tagline">READY FOR MONTH TWO</div>
-      </div>
-      <div class="pillar reveal" style="transition-delay:.16s"><span class="corner-orb"></span>
-        <div class="icon-wrap"><div class="icon-in"><svg viewBox="0 0 24 24"><path d="M17 2l4 4-4 4M21 6H8a5 5 0 00-5 5M7 22l-4-4 4-4M3 18h13a5 5 0 005-5"/></svg></div></div>
-        <h3>One API, every surface</h3>
-        <div class="tagline">DASHBOARD + CHATBOT, SAME SOURCE</div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="loop" id="loop">
-  <div class="wrap">
-    <div class="sec-head reveal">
-      <h2>Pipeline</h2>
-    </div>
-    <div class="loop-track reveal stagger">
-      <div class="loop-node">
-        <div class="loop-dot"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M4 9h16M9 4v16"/></svg></div>
-        <div class="loop-step">01 &middot; INGEST</div>
-        <h4>50 Excel files</h4>
-      </div>
-      <div class="loop-node">
-        <div class="loop-dot"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
-        <div class="loop-step">02 &middot; VALIDATE</div>
-        <h4>Checked live</h4>
-      </div>
-      <div class="loop-node">
-        <div class="loop-dot"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12h8M12 8v8"/></svg></div>
-        <div class="loop-step">03 &middot; STRUCTURE</div>
-        <h4>Normalized schema</h4>
-      </div>
-      <div class="loop-node">
-        <div class="loop-dot"><svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg></div>
-        <div class="loop-step">04 &middot; UNDERSTAND</div>
-        <h4>API + chatbot</h4>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="term-sec" id="tests">
-  <div class="wrap">
-    <div class="sec-head reveal">
-      <h2>If the data lies,<br><span class="grad-text">the suite fails the build.</span></h2>
-      <p class="sec-sub">Every fix in this project is locked in as a real, runnable test &mdash; not just a claim in a doc.</p>
-    </div>
-    <div class="term-window reveal">
-      <div class="term-bar">
-        <span class="dots"><i></i><i></i><i></i></span>
-        <span class="term-title">aker &middot; pytest</span>
-      </div>
-      <div class="term-body" id="termBody"></div>
-    </div>
-  </div>
 </section>
 
 <section class="eq-sec" id="explore">
@@ -283,15 +184,6 @@
   <div class="marquee m2"><div class="marquee-track" id="mq2"></div></div>
 </section>
 
-<section class="anomaly-sec" id="anomalies">
-  <div class="wrap">
-    <div class="sec-head reveal">
-      <h2>Anomalies</h2>
-    </div>
-    <div class="anomaly-list reveal stagger" id="anomalyList"></div>
-  </div>
-</section>
-
 <footer>
   <div class="wrap foot-in">
     <div class="foot-brand">
@@ -299,16 +191,17 @@
       <p>Aker AI round 2 case study.</p>
     </div>
     <div class="foot-col">
-      <div><h5>Layers</h5><a href="#stats">Data quality</a><a href="#revenue">Revenue</a><a href="#library">Portfolio</a><a href="/docs" target="_blank">API reference</a></div>
-      <div><h5>Built on</h5><a href="https://fastapi.tiangolo.com" target="_blank" rel="noopener">FastAPI</a><a href="https://sqlite.org" target="_blank" rel="noopener">SQLite</a><a href="https://www.anthropic.com" target="_blank" rel="noopener">Anthropic</a></div>
+      <div><h5>Product</h5><a href="#explore">Explore</a><a href="#revenue">Revenue</a><a href="#library">Portfolio</a></div>
+      <div><h5>More</h5><a href="how-it-works.html">How it's built</a><a href="/docs" target="_blank">API reference</a></div>
     </div>
   </div>
   <div class="wrap foot-base">
     <span>AKER AI &middot; ROUND 2 CASE STUDY</span>
-    <span class="r">DASHBOARD &middot; CHATBOT NEXT</span>
+    <span class="r"><a href="how-it-works.html" style="color:inherit">HOW IT'S BUILT &rarr;</a></span>
   </div>
 </footer>
 
+<script src="shared.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
