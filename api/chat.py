@@ -23,12 +23,27 @@ from api.db import DB_PATH
 load_dotenv()
 
 MODEL = "claude-haiku-4-5-20251001"
-MAX_TOKENS = 1500
+MAX_TOKENS = 450
 MAX_TOOL_ITERATIONS = 6
+
+# Cap on list length sent to the MODEL inside tool_result blocks (token cost). The
+# frontend gets the untouched, full result over a separate SSE event -- rendering a
+# table/chart client-side is free, it never passes through the LLM. Source queries are
+# already ordered by relevance (balance DESC, lease_expiration ASC, etc.), so keeping
+# the first N keeps the part a human would actually look at.
+MODEL_LIST_CAP = 20
 
 SYSTEM_PROMPT = """You are the Aker Portfolio Terminal copilot -- a real estate portfolio
 analyst embedded in a dashboard covering 15 properties, ~4,100 tenancies, loaded from a
 single month's Rent Roll and Unit Availability snapshot.
+
+The dashboard already renders every tool's raw result as a real table or bar chart the
+instant the tool returns -- the user sees the actual numbers on screen before you finish
+writing. Your job is NOT to restate the data. Write 1-3 short sentences: the direct
+answer plus one genuine insight or caveat. Never use markdown headers or bullet lists.
+You may bold at most one figure with **that** if it's the single number that matters.
+Do not enumerate a list of properties/units/residents in prose -- the table already
+shows them.
 
 Rules:
 - Call a tool for every real number. Never estimate, round from memory, or recall a
@@ -208,6 +223,25 @@ def _open_conn():
     return conn
 
 
+def _truncate_for_model(result, limit=MODEL_LIST_CAP):
+    """Trims long lists before they go into the model's tool_result content -- the
+    frontend still gets the full, untouched result via the separate tool_result SSE
+    event below, so nothing the user sees is capped, only what costs tokens."""
+    if isinstance(result, list):
+        if len(result) > limit:
+            return result[:limit] + [{"_truncated_note": f"{len(result) - limit} more rows omitted here (shown in full on screen)"}]
+        return result
+    if isinstance(result, dict):
+        out = {}
+        for k, v in result.items():
+            if isinstance(v, list) and len(v) > limit:
+                out[k] = v[:limit] + [{"_truncated_note": f"{len(v) - limit} more rows omitted here (shown in full on screen)"}]
+            else:
+                out[k] = v
+        return out
+    return result
+
+
 def _sse(event, data):
     return f"event: {event}\ndata: {json.dumps(data, default=str)}\n\n"
 
@@ -260,7 +294,10 @@ def stream_chat(history, tool_dispatch):
                 if fn is None:
                     raise ValueError(f"Unknown tool: {block.name}")
                 result = fn(block.input, conn)
-                content = json.dumps(result, default=str)
+                # full, untouched result -> frontend, rendered as a table/chart. This
+                # never passes through the LLM, so it costs zero extra tokens.
+                yield _sse("tool_result", {"tool": block.name, "result": result})
+                content = json.dumps(_truncate_for_model(result), default=str)
             except Exception as e:
                 is_error = True
                 content = str(e)

@@ -324,8 +324,8 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;position:relative;z-
 .copilot-bubble.hidden{display:none}
 .copilot-bubble-mark{font-family:'Bricolage Grotesque';font-weight:800;font-size:22px;color:#04131f}
 
-.copilot-panel{position:fixed;right:24px;bottom:24px;width:388px;max-width:calc(100vw - 32px);
-  height:min(600px,calc(100vh - 110px));z-index:95;display:flex;flex-direction:column;
+.copilot-panel{position:fixed;right:24px;bottom:24px;width:640px;max-width:calc(100vw - 32px);
+  height:min(840px,calc(100vh - 90px));z-index:95;display:flex;flex-direction:column;
   border:1px solid var(--line);border-radius:20px;background:rgba(9,10,15,.97);
   backdrop-filter:blur(18px);box-shadow:0 30px 80px rgba(0,0,0,.55);overflow:hidden;
   opacity:0;visibility:hidden;transform:translateY(16px) scale(.97);transform-origin:bottom right;
@@ -365,6 +365,34 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;position:relative;z-
 .copilot-tool-chip{font-family:'JetBrains Mono';font-size:10px;color:var(--cyan);
   background:rgba(111,210,255,.08);border:1px solid rgba(111,210,255,.25);border-radius:99px;
   padding:3px 10px;display:inline-flex;width:fit-content;margin-left:35px}
+
+/* ── data cards: rendered straight from the tool_result SSE payload, client-side,
+   no LLM tokens involved -- real tables/bars from the actual API response, not the
+   model describing them in prose. ── */
+.copilot-card{width:100%;border:1px solid var(--line);border-radius:14px;background:var(--void-2);
+  padding:14px;margin-left:35px;max-width:calc(100% - 35px)}
+
+.copilot-kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:10px;margin-bottom:2px}
+.copilot-kpi-v{font-size:15px;font-weight:700}
+.copilot-kpi-k{font-size:9.5px;color:var(--faint);margin-top:3px;letter-spacing:.03em;text-transform:uppercase}
+.copilot-card .copilot-kpi-row + .copilot-barlist,
+.copilot-card .copilot-kpi-row + .copilot-table-wrap{margin-top:14px;padding-top:14px;border-top:1px solid var(--line-2)}
+
+.copilot-barlist{display:flex;flex-direction:column;gap:8px}
+.copilot-bar-row{display:grid;grid-template-columns:110px 1fr 76px;align-items:center;gap:9px}
+.copilot-bar-label{font-size:11.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.copilot-bar-track{height:7px;border-radius:99px;background:rgba(148,163,184,.12);overflow:hidden}
+.copilot-bar-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#6fd2ff,#3fa9e8)}
+.copilot-bar-val{font-family:'JetBrains Mono';font-size:11px;text-align:right}
+
+.copilot-table-wrap{overflow-x:auto}
+.copilot-table{width:100%;border-collapse:collapse;font-size:11.5px}
+.copilot-table th{text-align:left;color:var(--faint);font-weight:500;font-size:10px;letter-spacing:.04em;
+  text-transform:uppercase;padding:0 8px 8px 0;white-space:nowrap}
+.copilot-table td{padding:6px 8px 6px 0;border-top:1px solid var(--line-2);white-space:nowrap}
+.copilot-table td:first-child,.copilot-table th:first-child{padding-left:0}
+.copilot-table-more{font-family:'JetBrains Mono';font-size:10px;color:var(--faint);margin-top:8px}
+.copilot-empty{font-size:12px;color:var(--faint)}
 
 .copilot-input-row{display:flex;gap:8px;padding:12px 14px;border-top:1px solid var(--line-2);flex:none}
 .copilot-input-row input{flex:1;padding:10px 13px;border-radius:11px;border:1px solid var(--line);
