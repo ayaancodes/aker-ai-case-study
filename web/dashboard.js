@@ -5,19 +5,23 @@ let CURRENT_PROPERTY_ID = null; // null = portfolio view
 let PORTFOLIO = null;
 
 async function init() {
-  const [revenue, properties, occupancy, concentration, delinquent, leases] = await Promise.all([
+  const [revenue, properties, occupancy, concentration, delinquent, leases, stats, anomalies] = await Promise.all([
     api("/revenue/portfolio"),
     api("/properties"),
     api("/occupancy/portfolio"),
     api("/revenue/concentration"),
     api("/delinquent"),
     api("/leases/expiring?days=60"),
+    api("/stats"),
+    api("/anomalies"),
   ]);
 
-  PORTFOLIO = { revenue, properties, occupancy, delinquent, leases: leases.leases, leaseRef: leases.reference_date };
+  PORTFOLIO = { revenue, properties, occupancy, delinquent, leases: leases.leases, leaseRef: leases.reference_date, stats, anomalies };
   const sortedByRevenue = [...revenue.by_property].sort((a, b) => b.net_effective_revenue - a.net_effective_revenue);
 
   renderSidebar(sortedByRevenue);
+  renderHeader(properties, stats, anomalies, leases.reference_date);
+  renderSignals(stats, anomalies);
   renderPortfolioKpis(revenue, occupancy, delinquent, leases.leases, leases.reference_date);
   renderRevenueChart(sortedByRevenue);
   renderOccupancyChart(occupancy.by_property, sortedByRevenue);
@@ -26,15 +30,77 @@ async function init() {
   renderDelinquentList("delinquentList", delinquent);
   renderLeaseList("leaseList", leases.leases);
 
-  const first = await api(`/properties/${sortedByRevenue[0].property_id}`);
-  document.getElementById("asOfNote").textContent = `AS OF ${first?.latest_as_of_date?.rent_roll || "—"}`;
+  document.getElementById("asOfNote").textContent = `AS OF ${leases.reference_date || "—"}`;
 
   document.getElementById("dashSearch").addEventListener("input", (e) => {
     renderSidebar(sortedByRevenue, e.target.value);
   });
   document.getElementById("dashBack").addEventListener("click", () => showPortfolioView());
 
+  // tab chips switch the portfolio panes; data is already rendered, pure show/hide
+  document.getElementById("dashTabs").addEventListener("click", (e) => {
+    const tab = e.target.closest(".dash-tab");
+    if (!tab) return;
+    document.querySelectorAll(".dash-tab").forEach((t) => t.classList.toggle("on", t === tab));
+    document.querySelectorAll(".dash-tab-pane").forEach((p) => {
+      p.style.display = p.dataset.pane === tab.dataset.tab ? "" : "none";
+    });
+  });
+
   observeReveals();
+}
+
+/* fact chips + Healthy/Watch status, all real: watch = properties carrying at least
+   one data quality flag, healthy = the rest. Same source as /anomalies. */
+function renderHeader(properties, stats, anomalies, asOf) {
+  const flagged = new Set(anomalies.map((a) => a.property_id));
+  const healthy = properties.filter((p) => !flagged.has(p.property_id)).length;
+
+  document.getElementById("dashFactChips").innerHTML = [
+    `${stats.properties} properties`,
+    `${stats.tenancies.toLocaleString()} tenancies`,
+    `as of ${asOf}`,
+  ].map((t) => `<span class="dash-chip">${t}</span>`).join("");
+
+  document.getElementById("dashStatusChips").innerHTML =
+    `<span class="status-chip healthy"><span class="sdot"></span>${healthy} Healthy</span>` +
+    `<span class="status-chip watch"><span class="sdot"></span>${flagged.size} Watch</span>`;
+}
+
+/* Copilot signals card: short findings assembled from the real flag rows and /stats,
+   each one traceable to an endpoint. No invented narrative. */
+function renderSignals(stats, anomalies) {
+  const missing = anomalies.filter((a) => a.flag_type === "missing_charges");
+  const partial = anomalies.filter((a) => a.flag_type === "missing_charges_partial");
+  const dates = anomalies.filter((a) => a.flag_type === "implausible_dates");
+
+  const signals = [];
+  if (missing.length) {
+    const props = [...new Set(missing.map((a) => a.property_id))];
+    signals.push({
+      text: `${props.length} properties have most occupied tenancies with zero recorded charge lines. Their revenue is understated in this snapshot.`,
+      tags: ["missing charges", ...(partial.length ? [`+${partial.length} partial`] : [])],
+    });
+  }
+  if (stats.holdover_leases) {
+    signals.push({
+      text: `${stats.holdover_leases} tenancies stayed on past their lease expiration and were never renewed.`,
+      tags: ["lease rollover", "holdovers"],
+    });
+  }
+  if (dates.length) {
+    signals.push({
+      text: `${dates.length} tenancies carry impossible dates in the source files, including a lease "expiring" in 2626.`,
+      tags: ["implausible dates"],
+    });
+  }
+
+  document.getElementById("signalsBody").innerHTML = signals.map((s) => `
+    <div class="signal">
+      <div class="signal-text">${s.text}</div>
+      <div class="signal-tags">${s.tags.map((t) => `<span class="signal-tag"><span class="sdot"></span>${t}</span>`).join("")}</div>
+    </div>
+  `).join("") + `<a class="signals-evidence" href="how-it-works.html#anomalies">View evidence &rarr;</a>`;
 }
 
 function renderSidebar(sorted, query = "") {
@@ -99,15 +165,59 @@ async function showPropertyView(propertyId) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-/* ── KPI tiles with a small real-data visual under each number. No trend lines on
-   purpose -- one snapshot loaded, so every mini-viz shows composition, not time.
-   pop (optional) is extra detail HTML shown in a hover popover -- this replaced the
-   property view's separate revenue/delinquent/rollover panels. ── */
-function kpiTile(value, label, vizId, legend, pop) {
+/* ── KPI tiles: icon chip, number, label, and a small real-data visual. No trend
+   lines on purpose -- one snapshot loaded, so every mini-viz shows composition or
+   distribution across properties, never time. pop (optional) is extra detail HTML
+   shown in a hover popover. ── */
+const KPI_ICONS = {
+  money: `<svg viewBox="0 0 24 24"><path d="M12 2v20M17 6H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>`,
+  grid: `<svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M4 9h16M9 4v16"/></svg>`,
+  pct: `<svg viewBox="0 0 24 24"><path d="M19 5L5 19"/><circle cx="7" cy="7" r="2.6"/><circle cx="17" cy="17" r="2.6"/></svg>`,
+  alert: `<svg viewBox="0 0 24 24"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18.2v.1"/></svg>`,
+  cal: `<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>`,
+};
+
+function kpiTile(value, label, vizId, legend, pop, icon) {
+  const ic = icon ? `<div class="ki">${KPI_ICONS[icon]}</div>` : "";
   const viz = vizId ? `<canvas id="${vizId}"></canvas>` : "";
   const leg = legend ? `<div class="kpi-legend">${legend}</div>` : "";
   const popEl = pop ? `<div class="kpi-pop">${pop}</div>` : "";
-  return `<div class="kpi-tile ${pop ? "has-pop" : ""}"><div class="kv">${value}</div><div class="kk">${label}</div>${viz}${leg}${popEl}</div>`;
+  return `<div class="kpi-tile ${pop ? "has-pop" : ""}">${ic}<div class="kv">${value}</div><div class="kk">${label}</div>${viz}${leg}${popEl}</div>`;
+}
+
+/* soft area mini-viz in Aker's card style: thin line + gradient fill + end dot.
+   Drawn from the SORTED per-property distribution, not a time series -- the legend
+   under each tile says so, and there is deliberately no MoM/delta anywhere. */
+function drawKpiArea(id, values) {
+  const cv = document.getElementById(id);
+  if (!cv || !values.length) return;
+  const { ctx, w, h } = fitCanvas(cv);
+  ctx.clearRect(0, 0, w, h);
+  const max = Math.max(...values, 1);
+  const pts = values.map((v, i) => [
+    values.length === 1 ? w : (i / (values.length - 1)) * (w - 4),
+    h - 3 - (Math.max(v, 0) / max) * (h - 8),
+  ]);
+  const fill = ctx.createLinearGradient(0, 0, 0, h);
+  fill.addColorStop(0, "rgba(127,199,155,.28)");
+  fill.addColorStop(1, "rgba(127,199,155,.02)");
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], h);
+  pts.forEach(([x, y]) => ctx.lineTo(x, y));
+  ctx.lineTo(pts[pts.length - 1][0], h);
+  ctx.closePath();
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.beginPath();
+  pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  ctx.strokeStyle = "#7FC79B";
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+  const [lx, ly] = pts[pts.length - 1];
+  ctx.beginPath();
+  ctx.arc(lx, ly, 2.6, 0, Math.PI * 2);
+  ctx.fillStyle = "#7FC79B";
+  ctx.fill();
 }
 
 function popRows(pairs) {
@@ -187,23 +297,23 @@ function renderPortfolioKpis(revenue, occupancy, delinquent, leases, leaseRefDat
 
   document.getElementById("dashKpiStrip").innerHTML =
     kpiTile(fmtMoney(revenue.total_net_effective_revenue), "Net effective revenue",
-      "kpiNetViz", "TOP 5 PROPERTIES + REST", netPop) +
+      "kpiNetViz", "BY PROPERTY · SORTED", netPop, "money") +
     kpiTile(fmtMoney(revenue.total_gross_revenue), "Gross revenue",
-      "kpiGrossViz", "GROSS VS CONCESSIONS", grossPop) +
+      "kpiGrossViz", "GROSS VS CONCESSIONS", grossPop, "money") +
     kpiTile(occupancy.pct_occ != null ? occupancy.pct_occ.toFixed(1) + "%" : "—", "Occupancy",
-      "kpiOccViz", `${occupancy.total_occupied} OF ${occupancy.total_units} UNITS`) +
+      "kpiOccViz", `${occupancy.total_occupied} OF ${occupancy.total_units} UNITS`, null, "pct") +
     kpiTile(fmtMoney(totalDelinquent), "Total delinquent",
-      "kpiDelViz", "TOP 5 BALANCES + REST", delinquentPop) +
+      "kpiDelViz", "BALANCES · LARGEST FIRST", delinquentPop, "alert") +
     kpiTile(leases.length, "Leases rolling over (60d)",
-      "kpiRollViz", `${within30} WITHIN 30D · ${leases.length - within30} IN 31-60D`, rolloverPop);
+      "kpiRollViz", `${within30} WITHIN 30D · ${leases.length - within30} IN 31-60D`, rolloverPop, "cal");
 
-  drawKpiSegments("kpiNetViz", topSegments(revenue.by_property, (p) => p.net_effective_revenue));
+  drawKpiArea("kpiNetViz", [...revenue.by_property].map((p) => p.net_effective_revenue).sort((a, b) => b - a));
   drawKpiSegments("kpiGrossViz", [
     { value: revenue.total_gross_revenue, color: "#7FC79B" },
     { value: Math.abs(revenue.total_concessions), color: "#E2836F" },
   ]);
   if (occupancy.pct_occ != null) drawKpiProgress("kpiOccViz", occupancy.pct_occ);
-  drawKpiSegments("kpiDelViz", topSegments(delinquent, (r) => r.balance).map((s) => ({ ...s, color: s.color === "rgba(148,163,184,.25)" ? s.color : "#E2836F" })));
+  drawKpiArea("kpiDelViz", delinquent.map((r) => r.balance).sort((a, b) => b - a).slice(0, 40));
   drawKpiSegments("kpiRollViz", [
     { value: within30 || 0.0001, color: "#C9A96A" },
     { value: (leases.length - within30) || 0.0001, color: "rgba(201,169,106,.35)" },
@@ -238,14 +348,14 @@ function renderPropertyKpis(rev, occ, delinquent, leases) {
 
   document.getElementById("dashKpiStrip").innerHTML =
     kpiTile(fmtMoney(rev.net_effective_revenue), "Net effective revenue",
-      "kpiPNetViz", "NET VS CONCESSIONS · HOVER FOR BREAKDOWN", revenuePop) +
+      "kpiPNetViz", "NET VS CONCESSIONS · HOVER FOR BREAKDOWN", revenuePop, "money") +
     kpiTile(occ.pct_occ != null ? occ.pct_occ.toFixed(1) + "%" : "—", "Occupancy",
-      "kpiPOccViz", `${occ.occupied} OF ${occ.total_units} UNITS`, occPop) +
+      "kpiPOccViz", `${occ.occupied} OF ${occ.total_units} UNITS`, occPop, "pct") +
     kpiTile(occ.total_units, "Units",
-      "kpiPUnitsViz", `${occ.occupied} OCC · ${occ.on_notice} NOTICE · ${occ.vacant} VACANT`, occPop) +
+      "kpiPUnitsViz", `${occ.occupied} OCC · ${occ.on_notice} NOTICE · ${occ.vacant} VACANT`, occPop, "grid") +
     kpiTile(fmtMoney(totalDelinquent), "Delinquent",
-      "kpiPDelViz", "TOP 5 BALANCES + REST · HOVER FOR NAMES", delinquentPop) +
-    kpiTile(leases.length, "Rolling over (60d)", null, "HOVER FOR NEXT EXPIRATIONS", rolloverPop);
+      "kpiPDelViz", "TOP 5 BALANCES + REST · HOVER FOR NAMES", delinquentPop, "alert") +
+    kpiTile(leases.length, "Rolling over (60d)", null, "HOVER FOR NEXT EXPIRATIONS", rolloverPop, "cal");
 
   drawKpiSegments("kpiPNetViz", [
     { value: rev.net_effective_revenue || 0.0001, color: "#4CAF82" },

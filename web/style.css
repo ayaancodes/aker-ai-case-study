@@ -239,11 +239,59 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;position:relative;z-
 .dash-pitem.all{margin-bottom:8px;padding-bottom:9px;border-bottom:1px solid var(--line-2)}
 
 .dash-main{padding:28px 32px 60px}
+
+/* header block after Aker's AM Dashboard: eyebrow, big title, real fact chips, and
+   Healthy/Watch status chips computed live from data quality flags */
+.dash-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;
+  flex-wrap:wrap;margin-bottom:24px}
+.dash-head-eyebrow{font-family:'JetBrains Mono';font-size:10px;letter-spacing:.16em;color:var(--faint);margin-bottom:6px}
+.dash-head-title{font-family:'Bricolage Grotesque';font-weight:700;font-size:30px;letter-spacing:-.02em;margin-bottom:12px}
+.dash-head-chips{display:flex;gap:8px;flex-wrap:wrap}
+.dash-chip{font-size:11.5px;color:var(--dim);background:var(--glass-2);border:1px solid var(--line);
+  border-radius:8px;padding:5px 11px}
+.dash-head-status{display:flex;gap:8px;margin-top:34px}
+.status-chip{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;
+  border-radius:9px;padding:6px 12px;border:1px solid var(--line);background:var(--glass-2)}
+.status-chip .sdot{width:7px;height:7px;border-radius:50%;flex:none}
+.status-chip.healthy .sdot{background:var(--profit);box-shadow:0 0 8px var(--profit)}
+.status-chip.watch .sdot{background:var(--warn);box-shadow:0 0 8px var(--warn)}
+
+/* suite links block above the property finder, like Aker's left rail */
+.dash-suite{display:flex;flex-direction:column;gap:2px;margin-bottom:20px}
+
+/* tab chips switching the portfolio panels, like their Overview/Financial/Operational */
+.dash-tabs{display:flex;gap:8px;margin-bottom:18px}
+.dash-tab{font-family:'Instrument Sans';font-weight:600;font-size:13px;color:var(--dim);cursor:pointer;
+  background:var(--glass-2);border:1px solid var(--line);border-radius:10px;padding:9px 18px;
+  transition:color .2s,border-color .2s,background .2s}
+.dash-tab:hover{color:var(--ink)}
+.dash-tab.on{color:var(--cyan);background:rgba(127,199,155,.1);border-color:rgba(127,199,155,.3)}
+
+/* overview layout: charts left, Copilot signals card right */
+.dash-grid-hero{display:grid;grid-template-columns:1fr 300px;gap:18px;align-items:start}
+.dash-grid-hero .dash-grid-2{grid-template-columns:1fr 1fr}
+@media (max-width:1200px){.dash-grid-hero{grid-template-columns:1fr}}
+.signals-card .eq-head{padding-bottom:4px}
+.signals-body{padding:10px 22px 20px;display:flex;flex-direction:column;gap:16px}
+.signal{border-bottom:1px solid var(--line-2);padding-bottom:14px}
+.signal:last-child{border-bottom:none;padding-bottom:0}
+.signal-text{font-size:13px;line-height:1.55;color:var(--ink);margin-bottom:9px}
+.signal-tags{display:flex;gap:6px;flex-wrap:wrap}
+.signal-tag{display:inline-flex;align-items:center;gap:5px;font-family:'JetBrains Mono';font-size:9.5px;
+  color:var(--dim);border:1px solid var(--line);border-radius:99px;padding:3px 9px}
+.signal-tag .sdot{width:5px;height:5px;border-radius:50%;background:var(--warn);flex:none}
+.signals-evidence{font-family:'JetBrains Mono';font-size:10.5px;color:var(--cyan);text-decoration:none;
+  display:inline-flex;align-items:center;gap:6px;margin-top:2px}
+.signals-evidence:hover{text-decoration:underline}
+
 .dash-kpi-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:26px}
 .kpi-tile{position:relative;border:1px solid var(--line);border-radius:14px;padding:16px 18px;background:var(--void-2)}
+.kpi-tile .ki{width:26px;height:26px;border-radius:8px;background:rgba(127,199,155,.1);
+  border:1px solid rgba(127,199,155,.22);display:grid;place-items:center;margin-bottom:10px}
+.kpi-tile .ki svg{width:13px;height:13px;stroke:var(--cyan);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .kpi-tile .kv{font-family:'JetBrains Mono';font-size:21px;font-weight:700}
 .kpi-tile .kk{font-size:11.5px;color:var(--dim);margin-top:5px}
-.kpi-tile canvas{display:block;width:100%;height:26px;margin-top:12px}
+.kpi-tile canvas{display:block;width:100%;height:30px;margin-top:12px}
 .kpi-legend{font-family:'JetBrains Mono';font-size:8.5px;color:var(--faint);margin-top:6px;letter-spacing:.04em}
 
 /* hover popover on a KPI tile -- carries the detail that used to live in separate

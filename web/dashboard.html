@@ -43,60 +43,98 @@
 
 <div class="dash-layout">
   <aside class="dash-sidebar">
+    <div class="dash-sidebar-head">PRODUCT SUITE</div>
+    <div class="dash-suite">
+      <a class="copilot-side-link on" href="dashboard.html">AM Dashboard</a>
+      <a class="copilot-side-link" href="copilot.html">AM Copilot</a>
+    </div>
     <div class="dash-sidebar-head">PROPERTIES</div>
     <div class="dash-search"><input type="text" id="dashSearch" placeholder="Search&hellip;" autocomplete="off"></div>
     <div class="dash-plist" id="dashPropertyList"></div>
   </aside>
 
   <main class="dash-main">
+    <!-- header block after Aker's own AM Dashboard: eyebrow, title, real fact chips,
+         and Healthy/Watch status chips computed from actual data quality flags -->
+    <div class="dash-head">
+      <div>
+        <div class="dash-head-eyebrow">AM DASHBOARD</div>
+        <h1 class="dash-head-title">Portfolio intelligence</h1>
+        <div class="dash-head-chips" id="dashFactChips"></div>
+      </div>
+      <div class="dash-head-status" id="dashStatusChips"></div>
+    </div>
+
     <div class="dash-kpi-strip" id="dashKpiStrip"></div>
 
     <!-- ───────── PORTFOLIO VIEW (default) ───────── -->
     <div id="dashPortfolioView">
-      <div class="dash-section dash-grid-2">
-        <div class="eq-panel">
-          <div class="eq-head">
-            <div><div class="eq-title">Net effective revenue by property</div><div class="eq-sub">scroll for all 15</div></div>
-          </div>
-          <div class="eq-body scrolly"><canvas id="revenueChart"></canvas><div class="eq-tip" id="revenueTip"></div></div>
-        </div>
-        <div class="eq-panel">
-          <div class="eq-head">
-            <div><div class="eq-title">Occupancy by property</div><div class="eq-sub">scroll for all 15</div></div>
-          </div>
-          <div class="eq-body scrolly"><canvas id="occupancyChart"></canvas><div class="eq-tip" id="occupancyTip"></div></div>
-        </div>
+      <div class="dash-tabs" id="dashTabs">
+        <button class="dash-tab on" data-tab="overview">Overview</button>
+        <button class="dash-tab" data-tab="financial">Financial</button>
+        <button class="dash-tab" data-tab="risk">Risk</button>
       </div>
 
-      <div class="dash-section dash-grid-2">
-        <div class="eq-panel">
-          <div class="eq-head">
-            <div><div class="eq-title">Revenue mix</div><div class="eq-sub">by charge category</div></div>
+      <div class="dash-tab-pane" data-pane="overview">
+        <div class="dash-section dash-grid-hero">
+          <div class="dash-grid-hero-left">
+            <div class="dash-section dash-grid-2" style="margin-bottom:18px">
+              <div class="eq-panel">
+                <div class="eq-head">
+                  <div><div class="eq-title">Net effective revenue by property</div><div class="eq-sub">scroll for all 15</div></div>
+                </div>
+                <div class="eq-body scrolly"><canvas id="revenueChart"></canvas><div class="eq-tip" id="revenueTip"></div></div>
+              </div>
+              <div class="eq-panel">
+                <div class="eq-head">
+                  <div><div class="eq-title">Occupancy by property</div><div class="eq-sub">scroll for all 15</div></div>
+                </div>
+                <div class="eq-body scrolly"><canvas id="occupancyChart"></canvas><div class="eq-tip" id="occupancyTip"></div></div>
+              </div>
+            </div>
           </div>
-          <div class="eq-body eq-body-split">
-            <canvas id="donutChart"></canvas>
-            <div class="donut-legend" id="donutLegend"></div>
-          </div>
-        </div>
-        <div class="eq-panel">
-          <div class="eq-head">
-            <div><div class="eq-title">Concentration risk</div><div class="eq-sub">gross revenue by program type</div></div>
-          </div>
-          <div class="eq-body eq-body-split">
-            <canvas id="concChart"></canvas>
-            <div class="donut-legend" id="concLegend"></div>
+          <div class="eq-panel signals-card">
+            <div class="eq-head">
+              <div><div class="eq-title">AM Copilot signals</div><div class="eq-sub">from the load-time quality checks</div></div>
+            </div>
+            <div class="signals-body" id="signalsBody"></div>
           </div>
         </div>
       </div>
 
-      <div class="dash-section risk-grid">
-        <div class="eq-panel">
-          <div class="eq-head"><div><div class="eq-title">Delinquent balances</div></div></div>
-          <div class="risk-list" id="delinquentList"></div>
+      <div class="dash-tab-pane" data-pane="financial" style="display:none">
+        <div class="dash-section dash-grid-2">
+          <div class="eq-panel">
+            <div class="eq-head">
+              <div><div class="eq-title">Revenue mix</div><div class="eq-sub">by charge category</div></div>
+            </div>
+            <div class="eq-body eq-body-split">
+              <canvas id="donutChart"></canvas>
+              <div class="donut-legend" id="donutLegend"></div>
+            </div>
+          </div>
+          <div class="eq-panel">
+            <div class="eq-head">
+              <div><div class="eq-title">Concentration risk</div><div class="eq-sub">gross revenue by program type</div></div>
+            </div>
+            <div class="eq-body eq-body-split">
+              <canvas id="concChart"></canvas>
+              <div class="donut-legend" id="concLegend"></div>
+            </div>
+          </div>
         </div>
-        <div class="eq-panel">
-          <div class="eq-head"><div><div class="eq-title">Lease rollover</div><div class="eq-sub">expiring within 60 days</div></div></div>
-          <div class="risk-list" id="leaseList"></div>
+      </div>
+
+      <div class="dash-tab-pane" data-pane="risk" style="display:none">
+        <div class="dash-section risk-grid">
+          <div class="eq-panel">
+            <div class="eq-head"><div><div class="eq-title">Delinquent balances</div></div></div>
+            <div class="risk-list" id="delinquentList"></div>
+          </div>
+          <div class="eq-panel">
+            <div class="eq-head"><div><div class="eq-title">Lease rollover</div><div class="eq-sub">expiring within 60 days</div></div></div>
+            <div class="risk-list" id="leaseList"></div>
+          </div>
         </div>
       </div>
     </div>
