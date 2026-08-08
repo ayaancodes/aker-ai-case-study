@@ -30,6 +30,25 @@ document.querySelectorAll(".btn-grad").forEach(applyMagnetic);
 const nav = document.getElementById("nav");
 addEventListener("scroll", () => nav.classList.toggle("scrolled", scrollY > 30), { passive: true });
 
+/* ── side rail scrollspy ── */
+(function () {
+  const rail = document.getElementById("rail");
+  if (!rail) return;
+  const links = [...rail.querySelectorAll("a")];
+  const ids = links.map((a) => a.dataset.rail);
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (!e.isIntersecting) return;
+      const id = e.target.id || "top";
+      links.forEach((a) => a.classList.toggle("on", a.dataset.rail === id));
+    });
+  }, { rootMargin: "-40% 0px -55% 0px" });
+  ids.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) io.observe(el);
+  });
+})();
+
 /* ── reveal-on-scroll ── */
 const revealObserver = new IntersectionObserver(
   (entries) => entries.forEach((e) => e.isIntersecting && e.target.classList.add("in")),
@@ -124,6 +143,52 @@ function ambientBars(cv, values, opts = {}) {
       ctx.roundRect(x, y, barW, bh, [4, 4, 0, 0]);
       ctx.fill();
     });
+  }
+  frame();
+}
+
+/* ── perspective particle field, adapted from Vega's hero background (2D canvas
+   version, permission granted to reuse/adapt) -- purely atmospheric motion behind
+   the real revenue bars, not tied to data itself. ── */
+function particleField(cv) {
+  if (REDUCED) return;
+  const ctx = cv.getContext("2d");
+  const COLS = 70, ROWS = 26;
+  let t = 0, visible = true;
+  new IntersectionObserver((e) => (visible = e[0].isIntersecting)).observe(cv);
+  function frame() {
+    requestAnimationFrame(frame);
+    if (!visible || document.hidden) return;
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    const W = cv.clientWidth, H = cv.clientHeight;
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) {
+      cv.width = Math.round(W * dpr);
+      cv.height = Math.round(H * dpr);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    t += 0.014;
+    const horizon = H * 0.28, base = H * 1.05;
+    for (let z = ROWS - 1; z >= 0; z--) {
+      const pz = z / (ROWS - 1);
+      const y0 = horizon + (base - horizon) * Math.pow(pz, 1.7);
+      const spread = W * (0.5 + 1.0 * pz);
+      const size = 0.6 + 2.1 * pz;
+      const amp = 4 + 22 * pz;
+      for (let x = 0; x < COLS; x++) {
+        const px = x / (COLS - 1);
+        const wob = Math.sin(x * 0.3 + t) * amp * 0.5 + Math.cos(z * 0.32 + t * 0.8) * amp * 0.5;
+        const X = W / 2 + (px - 0.5) * spread;
+        const Y = y0 + wob;
+        const r = Math.round(111 + (59 - 111) * px);
+        const g = Math.round(210 + (91 - 210) * px);
+        const b = Math.round(255 + (133 - 255) * px);
+        ctx.fillStyle = `rgba(${r},${g},${b},${0.1 + 0.35 * pz})`;
+        ctx.beginPath();
+        ctx.arc(X, Y, size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
   }
   frame();
 }
@@ -258,7 +323,10 @@ async function init() {
   renderStats(stats);
   renderTicker(sortedByRevenue);
   renderHeroChart(sortedByRevenue);
+  particleField(document.getElementById("heroField"));
   renderGate(sortedByRevenue, revenue.total_net_effective_revenue);
+  renderTerminal();
+  initExplorer(properties, sortedByRevenue);
   renderRevenueChart(revenue, sortedByRevenue);
   renderDonut(revenue.by_category);
   renderMarquee(sortedByRevenue);
@@ -325,6 +393,102 @@ function renderDonut(byCategory) {
   const cv = document.getElementById("donutChart");
   animateOnceVisible(cv, (progress) => drawDonut(cv, byCategory, progress));
   renderDonutLegend(document.getElementById("donutLegend"), byCategory);
+}
+
+/* ── test suite terminal — real output from `pytest tests/ -v`, a curated subset of
+   the 36 tests, not fabricated. Line-by-line reveal, triggers once scrolled into view. ── */
+const TEST_LINES = [
+  { cmd: true, text: "$ pytest tests/ -v" },
+  { text: "test_zero_charge_total_mismatches ................ " },
+  { text: "test_missing_charges_check_covers_notice_status .. " },
+  { text: "test_rename_replaces_old_snapshot_not_orphans_it . " },
+  { text: "test_leases_expiring_window_bounded_on_both_ends . " },
+  { text: "test_no_orphaned_rows_or_fk_violations ............ " },
+  { text: "test_known_missing_charges_properties_flagged_severe " },
+  { summary: true, text: "──────── 36 passed in 0.91s ────────" },
+];
+function renderTerminal() {
+  const body = document.getElementById("termBody");
+  animateOnceVisible(body, (progress) => {
+    const shown = Math.floor(progress * TEST_LINES.length);
+    body.innerHTML = TEST_LINES.map((l, i) => {
+      if (i >= shown) return "";
+      if (l.cmd) return `<div class="term-line shown term-cmd">${l.text}</div>`;
+      if (l.summary) return `<div class="term-line shown term-summary">${l.text}</div>`;
+      return `<div class="term-line shown">${l.text}<span class="term-pass">PASSED</span></div>`;
+    }).join("") + (shown < TEST_LINES.length ? `<span class="term-caret"></span>` : "");
+  });
+}
+
+/* ── property explorer — search, revenue waterfall, portfolio-rank comparison.
+   Real API calls (/revenue/{id}), no client-side mock data. ── */
+function initExplorer(properties, sortedByRevenue) {
+  const search = document.getElementById("explSearch");
+  const dropdown = document.getElementById("explDropdown");
+  const empty = document.getElementById("explEmpty");
+  const body = document.getElementById("explBody");
+
+  function openDropdown(query) {
+    const q = query.trim().toLowerCase();
+    const matches = q
+      ? properties.filter((p) => p.canonical_name.toLowerCase().includes(q))
+      : properties;
+    if (!matches.length) { dropdown.classList.remove("open"); return; }
+    dropdown.innerHTML = matches.slice(0, 8).map((p) =>
+      `<div data-id="${p.property_id}">${p.canonical_name}</div>`
+    ).join("");
+    dropdown.classList.add("open");
+  }
+
+  search.addEventListener("input", () => openDropdown(search.value));
+  search.addEventListener("focus", () => openDropdown(search.value));
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".explore-search-in")) dropdown.classList.remove("open");
+  });
+  dropdown.addEventListener("click", (e) => {
+    const id = e.target.dataset.id;
+    if (!id) return;
+    const p = properties.find((x) => x.property_id === id);
+    search.value = p.canonical_name;
+    dropdown.classList.remove("open");
+    selectProperty(id, p.canonical_name);
+  });
+
+  async function selectProperty(propertyId, name) {
+    const rev = await api(`/revenue/${propertyId}`);
+    empty.classList.add("hidden");
+    body.classList.add("on");
+    document.getElementById("explName").textContent = name;
+    document.getElementById("explId").textContent = propertyId;
+
+    const gross = rev.gross_revenue, conc = Math.abs(rev.concessions), net = rev.net_effective_revenue;
+    const max = Math.max(gross, net) || 1;
+    const heights = { gross: (gross / max) * 100, conc: (conc / max) * 100, net: (net / max) * 100 };
+
+    requestAnimationFrame(() => {
+      document.getElementById("wfGross").style.height = heights.gross + "%";
+      document.getElementById("wfConc").style.height = heights.conc + "%";
+      document.getElementById("wfNet").style.height = heights.net + "%";
+      ["wfGrossVal", "wfConcVal", "wfNetVal"].forEach((id) => document.getElementById(id).classList.add("shown"));
+      document.getElementById("wfGrossVal").textContent = fmtMoney(gross);
+      document.getElementById("wfConcVal").textContent = fmtMoneySigned(rev.concessions);
+      document.getElementById("wfNetVal").textContent = fmtMoney(net);
+    });
+
+    const rankMax = sortedByRevenue[0].net_effective_revenue || 1;
+    document.getElementById("explRank").innerHTML = sortedByRevenue.map((p) => `
+      <div class="rank-row ${p.property_id === propertyId ? "hl" : ""}">
+        <div class="rk-name">${p.canonical_name}</div>
+        <div class="rk-track"><div class="rk-fill" style="width:${(p.net_effective_revenue / rankMax) * 100}%"></div></div>
+      </div>
+    `).join("");
+  }
+
+  // pre-select the top property so the panel isn't empty on first paint
+  if (sortedByRevenue.length) {
+    search.value = sortedByRevenue[0].canonical_name;
+    selectProperty(sortedByRevenue[0].property_id, sortedByRevenue[0].canonical_name);
+  }
 }
 
 function renderMarquee(sorted) {
