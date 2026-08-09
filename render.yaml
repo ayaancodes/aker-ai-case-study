@@ -1,0 +1,22 @@
+# Render blueprint: one web service runs everything (API + static frontend + copilot).
+# The SQLite database is committed to the repo and read-only at runtime, so there is
+# no database service to provision -- the whole deploy is this one process.
+#
+# Deploy steps (once):
+#   1. render.com -> New -> Blueprint -> connect the GitHub repo.
+#   2. When prompted, set ANTHROPIC_API_KEY (it is sync:false below on purpose --
+#      the key never goes in the repo).
+#   3. Deploy. Done: /health should return {"status":"ok"}.
+services:
+  - type: web
+    name: aker-ai-terminal
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: PYTHON_VERSION
+        value: 3.12.6
