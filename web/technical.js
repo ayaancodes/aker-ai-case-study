@@ -1,5 +1,9 @@
-/* ── test suite terminal — real output from `pytest tests/ -v`, a curated subset of
-   the 36 tests, not fabricated. Line-by-line reveal, triggers once scrolled into view. ── */
+/* ── test suite terminal — real output from `pytest tests/ -v`, a curated subset.
+   The pass count below is manually maintained (no cheap live source for it): re-run
+   `pytest tests/ -q` and update this line whenever tests are added, same discipline
+   as the counts in CLAUDE.md prose. Reveal is per-line on its own timer, NOT the
+   shared chart easing -- this should read like a terminal running, not a chart
+   drawing in. ── */
 const TEST_LINES = [
   { cmd: true, text: "$ pytest tests/ -v" },
   { text: "test_zero_charge_total_mismatches ................ " },
@@ -8,20 +12,43 @@ const TEST_LINES = [
   { text: "test_leases_expiring_window_bounded_on_both_ends . " },
   { text: "test_no_orphaned_rows_or_fk_violations ............ " },
   { text: "test_known_missing_charges_properties_flagged_severe " },
-  { summary: true, text: "──────── 36 passed in 0.91s ────────" },
+  { text: "test_revenue_bridge_ties_out ..................... " },
+  { text: "test_query_endpoint_guardrails ................... " },
+  { summary: true, text: "──────── 54 passed in 1.47s ────────" },
 ];
+const LINE_MS = 400;          // per test line
+const SUMMARY_PAUSE_MS = 900; // extra beat before the pass-count rule lands
+
+function renderTermLines(body, shown) {
+  body.innerHTML = TEST_LINES.map((l, i) => {
+    if (i >= shown) return "";
+    if (l.cmd) return `<div class="term-line shown term-cmd">${l.text}</div>`;
+    if (l.summary) return `<div class="term-line shown term-summary">${l.text}</div>`;
+    return `<div class="term-line shown">${l.text}<span class="term-pass">PASSED</span></div>`;
+  }).join("") + (shown < TEST_LINES.length ? `<span class="term-caret"></span>` : "");
+}
+
 function renderTerminal() {
   const body = document.getElementById("termBody");
   if (!body) return;
-  animateOnceVisible(body, (progress) => {
-    const shown = Math.floor(progress * TEST_LINES.length);
-    body.innerHTML = TEST_LINES.map((l, i) => {
-      if (i >= shown) return "";
-      if (l.cmd) return `<div class="term-line shown term-cmd">${l.text}</div>`;
-      if (l.summary) return `<div class="term-line shown term-summary">${l.text}</div>`;
-      return `<div class="term-line shown">${l.text}<span class="term-pass">PASSED</span></div>`;
-    }).join("") + (shown < TEST_LINES.length ? `<span class="term-caret"></span>` : "");
-  });
+  if (REDUCED) { renderTermLines(body, TEST_LINES.length); return; }
+  let started = false;
+  const io = new IntersectionObserver((entries) => {
+    if (!entries[0].isIntersecting || started) return;
+    started = true;
+    io.disconnect();
+    let shown = 1;
+    renderTermLines(body, shown);
+    const tick = () => {
+      shown += 1;
+      renderTermLines(body, shown);
+      if (shown >= TEST_LINES.length) return;
+      const nextIsSummary = TEST_LINES[shown].summary;
+      setTimeout(tick, nextIsSummary ? SUMMARY_PAUSE_MS : LINE_MS);
+    };
+    setTimeout(tick, LINE_MS);
+  }, { threshold: 0.3 });
+  io.observe(body);
 }
 
 function renderStats(stats) {
@@ -189,12 +216,94 @@ function initPipelineDive() {
   });
 }
 
+/* ── layer deep dives: what we did / what we found, per architecture layer. All
+   real catches from this build -- sources: CLAUDE.md sections 1/6/7 and the live
+   investigations run during this session. Matter-of-fact on purpose. ── */
+const LAYER_DIVES = {
+  source: { tag: "SOURCE DATA", title: "50 Excel files, taken as they came", did: [
+      "Walked all 50 files <b>programmatically</b>, not spot-checked: layout verified against every file before a single schema decision.",
+      "Cross-referenced Unit Availability against independently counted Rent Roll rows, file by file.",
+      "Found all <b>32 real charge codes</b> by scanning every charge line in every file, not by trusting a sample.",
+    ], found: [
+      "<b>3 structurally empty rent rolls</b> (134land, 183c, altapm): headers, zero unit rows, footers of straight zeros.",
+      "VACANT / MODEL / DOWN hiding in the <b>resident code field</b>, not a status column.",
+      "Commercial leases at The Ellsworth (143c) where market_rent is literally 0 in the file and the real rent lives in RENTRETL + CAMEST charge lines instead. Looked like a scraping bug; it is how the source prices retail.",
+    ] },
+  etl: { tag: "ETL / LOADER", title: "Parse, validate inline, write, repeat safely", did: [
+      "Identity from the <b>filename pattern</b> (176r &rarr; property 176, residential): no hardcoded property list anywhere.",
+      "Charge lines re-summed against each unit's own stated Total, live, during the load.",
+      "Idempotent re-runs: renamed or removed source files reconcile instead of orphaning snapshots.",
+    ], found: [
+      "The missing_charges check had <b>blind spots of its own</b>: first 'notice' tenants (33 more affected), then commercial units with market_rent 0, which were hiding the portfolio's single largest delinquency: <b>$178,806.41</b>.",
+      "as_of_date stored as MM/DD/YYYY silently broke every SQL date comparison; fixed at the parser, not patched in queries.",
+      "A renamed source file left an orphan snapshot that <b>double-counted revenue</b> until identity-based matching replaced filename matching.",
+    ] },
+  db: { tag: "DATABASE", title: "Normalized, snapshot-based, honest", did: [
+      "One table per real-world thing: properties &rarr; units &rarr; tenancies &rarr; charges, plus lookup and flag tables.",
+      "Snapshot design: a second month of data is <b>purely additive</b>, no redesign.",
+      "Data quality findings stored as queryable rows, not tribal knowledge.",
+    ], found: [
+      "The hand-count said 16 properties; the loader's dedup said <b>15</b>. The dedup was right.",
+      "The Halden has residential + affordable snapshots, and the first revenue views grouped by snapshot_id, <b>splitting one property's revenue across two rows</b>. Caught by sanity-checking views against real data before building on them.",
+    ] },
+  api: { tag: "API LAYER", title: "Narrow endpoints that double as AI tools", did: [
+      "Every endpoint deliberately small and single-purpose, so each one doubles as a <b>tool definition</b> for the copilot.",
+      "One read-only SQLite connection per request; the same db file the loader writes.",
+    ], found: [
+      "<b>Route order bug</b>: /revenue/{property_id} declared before /revenue/concentration swallowed the literal path as a property code.",
+      "Inner joins made zero-charge properties <b>vanish</b> from /revenue/portfolio instead of showing an honest $0. LEFT JOIN + COALESCE fixed the lie.",
+    ] },
+  ai: { tag: "AI LAYER", title: "A thin, checkable slice on top", did: [
+      "An agent loop over <b>16 tools</b>, each one a wrapper around a real endpoint. The model never touches SQL or files directly.",
+      "A grounding check compares every $ and % the model states against the tool data it was actually given.",
+      "Verify receipts: every answer lists the exact calls made, arguments included.",
+    ], found: [
+      "One QA pass caught <b>four real hallucinations</b>: 'no leases have expired' (331 had), guessed unit IDs, an invented property name ('Sutton Hill'), and a market region the data has no field for.",
+      "The grounding check's own percent-matching was unsound at first: it accepted a fabricated 88.4% because <b>some pair of numbers coincidentally divided to it</b>. Tightened before shipping.",
+    ] },
+  surfaces: { tag: "SURFACES", title: "Two fronts, one truth", did: [
+      "Dashboard and copilot both read the same API. If a number is wrong on one, it is wrong on both, and one test catches it.",
+      "Every chat evidence card renders from the raw tool payload, costing zero model tokens.",
+    ], found: [
+      "Chat cards silently <b>collapsed to 30px strips</b> past one screenful: column-flexbox children shrink by default, and overflow:hidden removed the min-height that was saving the text bubbles.",
+      "A sorted-distribution area chart read as a <b>declining trend line</b>, a false story for a one-snapshot dataset. Replaced with distribution bars.",
+    ] },
+};
+
+function initLayerDives() {
+  const modal = document.getElementById("layerModal");
+  if (!modal) return;
+  const close = () => { modal.classList.remove("open"); modal.setAttribute("aria-hidden", "true"); };
+  document.getElementById("layerBackdrop").addEventListener("click", close);
+  document.getElementById("layerClose").addEventListener("click", close);
+  addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+
+  document.querySelectorAll(".arch-explore").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const d = LAYER_DIVES[btn.dataset.layer];
+      if (!d) return;
+      document.getElementById("layerModalBody").innerHTML = `
+        <div class="gate-eyebrow">${d.tag}</div>
+        <h2>${d.title}</h2>
+        <div class="layer-dive-grid">
+          <div><div class="layer-dive-h">WHAT WE DID</div>
+            ${d.did.map((t) => `<div class="dive-item">${t}</div>`).join("")}</div>
+          <div><div class="layer-dive-h found">WHAT WE FOUND</div>
+            ${d.found.map((t) => `<div class="dive-item found">${t}</div>`).join("")}</div>
+        </div>`;
+      modal.classList.add("open");
+      modal.setAttribute("aria-hidden", "false");
+    });
+  });
+}
+
 async function init() {
   const [stats, anomalies] = await Promise.all([api("/stats"), api("/anomalies")]);
   renderStats(stats);
   renderTerminal();
   renderAnomalies(anomalies);
   initPipelineDive();
+  initLayerDives();
   observeReveals();
 }
 

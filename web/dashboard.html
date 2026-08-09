@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AKER AI &middot; AM Dashboard</title>
+<title>AKER AI &middot; Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -26,9 +26,8 @@
 
 <nav id="nav">
   <div class="nav-in">
-    <a class="logo" href="index.html"><svg class="logo-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.2 4 L17.5 20"/><path d="M12.4 11.3 L6.8 20"/></svg><span class="logo-word">AKER</span><span class="logo-pill">AI</span></a>
+    <a class="logo" href="dashboard.html"><svg class="logo-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.2 4 L17.5 20"/><path d="M12.4 11.3 L6.8 20"/></svg><span class="logo-word">AKER</span><span class="logo-pill">AI</span></a>
     <div class="nav-links links">
-      <a href="index.html">Home</a>
       <a href="how-it-works.html">How it's built</a>
     </div>
     <div class="nav-cta">
@@ -41,20 +40,29 @@
   <aside class="dash-sidebar">
     <div class="dash-sidebar-head">PRODUCT SUITE</div>
     <div class="dash-suite">
-      <a class="copilot-side-link on" href="dashboard.html">AM Dashboard</a>
-      <a class="copilot-side-link ai" href="copilot.html">AM Copilot <svg class="side-spark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.6L19.5 10.5l-5.6 1.9L12 18l-1.9-5.6L4.5 10.5l5.6-1.9z"/><path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg></a>
+      <a class="copilot-side-link on" href="dashboard.html">Dashboard <svg class="side-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg></a>
+      <a class="copilot-side-link ai" href="copilot.html">Aker AI Copilot <svg class="side-spark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.6L19.5 10.5l-5.6 1.9L12 18l-1.9-5.6L4.5 10.5l5.6-1.9z"/><path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg></a>
     </div>
-    <div class="dash-sidebar-head">PROPERTIES</div>
+    <div class="dash-sidebar-head props"><svg class="side-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V5l7-2.5V21M12 21h7V9l-7-2.5M8 8.5v.1M8 12v.1M8 15.5v.1M15.5 12v.1M15.5 15.5v.1"/></svg>PROPERTIES</div>
     <div class="dash-search"><input type="text" id="dashSearch" placeholder="Search&hellip;" autocomplete="off"></div>
     <div class="dash-plist" id="dashPropertyList"></div>
   </aside>
 
   <main class="dash-main">
+    <!-- loading state lives in the HTML so it paints before any JS runs; init()
+         removes it once real data has rendered. Over the network (Render) there's
+         a visible beat between first paint and the API responses. -->
+    <div class="dash-loading" id="dashLoading">
+      <span class="dash-spinner"></span>
+      <span class="mono">LOADING PORTFOLIO&hellip;</span>
+    </div>
+
+    <div class="dash-content" id="dashContent" hidden>
     <!-- header block after Aker's own AM Dashboard: eyebrow, title, real fact chips,
          and Healthy/Watch status chips computed from actual data quality flags -->
     <div class="dash-head">
       <div>
-        <div class="dash-head-eyebrow">AM DASHBOARD</div>
+        <div class="dash-head-eyebrow">DASHBOARD</div>
         <h1 class="dash-head-title">Portfolio intelligence</h1>
         <div class="dash-head-chips" id="dashFactChips"></div>
       </div>
@@ -179,6 +187,7 @@
         </div>
       </div>
     </div>
+    </div><!-- /dash-content -->
   </main>
 </div>
 

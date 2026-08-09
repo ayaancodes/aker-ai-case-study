@@ -1,4 +1,5 @@
 let CURRENT_PROPERTY_ID = null; // null = portfolio view
+let STATUS_FILTER = null; // null | "healthy" | "watch" -- set by the header chips
 // Portfolio-wide data fetched once at load and reused when returning from a property
 // view -- it's a single-snapshot database, nothing changes between clicks, so
 // re-fetching three endpoints on every back-click was pure waste.
@@ -64,6 +65,10 @@ async function init() {
     document.querySelectorAll("#programTabs .dash-tab").forEach((t) => t.classList.toggle("on", t === tab));
     renderDelinquentSplit(tab.dataset.program);
   });
+
+  // data is rendered: swap the loading state for the real content
+  document.getElementById("dashLoading").remove();
+  document.getElementById("dashContent").hidden = false;
 
   observeReveals();
 }
@@ -170,8 +175,23 @@ function renderHeader(properties, stats, anomalies, asOf) {
   ].map((t) => `<span class="dash-chip">${t}</span>`).join("");
 
   document.getElementById("dashStatusChips").innerHTML =
-    `<span class="status-chip healthy"><span class="sdot"></span>${healthy} Healthy</span>` +
-    `<span class="status-chip watch"><span class="sdot"></span>${flagged.size} Watch</span>`;
+    `<button class="status-chip healthy" data-status="healthy"><span class="sdot"></span>${healthy} Healthy</button>` +
+    `<button class="status-chip watch" data-status="watch"><span class="sdot"></span>${flagged.size} Watch</button>`;
+
+  // the chips are filters, not decoration: click Watch -> sidebar shows only the
+  // flagged properties and the Watchpoints strip scrolls into view; click again
+  // (or All properties) to clear
+  document.getElementById("dashStatusChips").addEventListener("click", (e) => {
+    const chip = e.target.closest(".status-chip");
+    if (!chip) return;
+    STATUS_FILTER = STATUS_FILTER === chip.dataset.status ? null : chip.dataset.status;
+    document.querySelectorAll(".status-chip").forEach((c) =>
+      c.classList.toggle("on", c.dataset.status === STATUS_FILTER));
+    renderSidebar(sortedPortfolio(), document.getElementById("dashSearch").value);
+    if (STATUS_FILTER === "watch") {
+      document.getElementById("signalsBody")?.scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "center" });
+    }
+  });
 }
 
 /* Copilot signals card: short findings assembled from the real flag rows and /stats,
@@ -213,7 +233,12 @@ function renderSignals(stats, anomalies) {
 function renderSidebar(sorted, query = "") {
   const list = document.getElementById("dashPropertyList");
   const q = query.trim().toLowerCase();
-  const matches = q ? sorted.filter((p) => p.canonical_name.toLowerCase().includes(q)) : sorted;
+  let matches = q ? sorted.filter((p) => p.canonical_name.toLowerCase().includes(q)) : sorted;
+  if (STATUS_FILTER && PORTFOLIO) {
+    const flagged = new Set(PORTFOLIO.anomalies.map((a) => a.property_id));
+    matches = matches.filter((p) =>
+      STATUS_FILTER === "watch" ? flagged.has(p.property_id) : !flagged.has(p.property_id));
+  }
 
   const allItem = `<div class="dash-pitem all ${CURRENT_PROPERTY_ID === null ? "on" : ""}" data-id="">
     <span>All properties</span>
@@ -242,6 +267,8 @@ function sortedPortfolio() {
 
 function showPortfolioView() {
   CURRENT_PROPERTY_ID = null;
+  STATUS_FILTER = null;
+  document.querySelectorAll(".status-chip").forEach((c) => c.classList.remove("on"));
   document.getElementById("dashPortfolioView").style.display = "";
   document.getElementById("dashPropertyView").style.display = "none";
   renderSidebar(sortedPortfolio(), document.getElementById("dashSearch").value);
@@ -652,6 +679,9 @@ document.getElementById("unitsBody").addEventListener("click", async (e) => {
 
 init().catch((err) => {
   console.error(err);
+  document.getElementById("dashLoading")?.remove();
+  const content = document.getElementById("dashContent");
+  if (content) content.hidden = false;
   document.body.insertAdjacentHTML(
     "afterbegin",
     `<div style="position:fixed;top:0;left:0;right:0;z-index:999;background:#f87171;color:#1a0000;padding:10px;text-align:center;font-family:monospace;font-size:13px">Failed to load dashboard: ${err.message}</div>`

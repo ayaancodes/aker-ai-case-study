@@ -85,10 +85,23 @@ function renderTicker(sorted) {
   }).join("");
 }
 
-/* ── sign-in modal (cosmetic only, no real auth) -- Enter navigates to the dashboard ── */
+/* ── sign-in modal. DEMO AFFORDANCE, not real auth: one fixed credential pair
+   checked client-side, no backend, no hashing -- the point is the flow, not
+   security. A sessionStorage flag remembers the login for this tab session only,
+   so coming back to the landing page never re-prompts until the tab closes. ── */
 (function () {
+  const DEMO_EMAIL = "moe@aker-ai.com";
+  const DEMO_PASSWORD = "demo2026";
+  const AUTH_KEY = "aker_authed";
+
   const modal = document.getElementById("loginModal");
+  const errorEl = document.getElementById("gateError");
   const open = () => {
+    // already signed in this session: straight to the dashboard, no second prompt
+    if (sessionStorage.getItem(AUTH_KEY) === "1") {
+      window.location.href = "dashboard.html";
+      return;
+    }
     modal.classList.add("open");
     modal.setAttribute("aria-hidden", "false");
     modal.querySelector(".gate-input")?.focus();
@@ -96,13 +109,27 @@ function renderTicker(sorted) {
   const close = () => {
     modal.classList.remove("open");
     modal.setAttribute("aria-hidden", "true");
+    errorEl.classList.remove("shown");
   };
   document.querySelectorAll("[data-open-login]").forEach((b) => b.addEventListener("click", open));
   document.getElementById("loginBackdrop").addEventListener("click", close);
   document.getElementById("loginClose").addEventListener("click", close);
   addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
-  document.getElementById("gateEnter").addEventListener("click", () => {
-    window.location.href = "dashboard.html";
+
+  const tryLogin = () => {
+    const email = document.getElementById("gateEmail").value.trim().toLowerCase();
+    const password = document.getElementById("gatePassword").value;
+    if (email === DEMO_EMAIL && password === DEMO_PASSWORD) {
+      sessionStorage.setItem(AUTH_KEY, "1");
+      window.location.href = "dashboard.html";
+    } else {
+      errorEl.classList.add("shown");
+    }
+  };
+  document.getElementById("gateEnter").addEventListener("click", tryLogin);
+  [document.getElementById("gateEmail"), document.getElementById("gatePassword")].forEach((el) => {
+    el.addEventListener("keydown", (e) => { if (e.key === "Enter") tryLogin(); });
+    el.addEventListener("input", () => errorEl.classList.remove("shown"));
   });
 })();
 

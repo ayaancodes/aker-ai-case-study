@@ -13,39 +13,34 @@
 
 <div class="cursor-glow" id="cursorGlow"></div>
 
+<!-- ───────── LAYER DEEP-DIVE MODAL — what we did / what we found, per layer. All
+     real catches from the build, none invented. ───────── -->
+<div class="modal" id="layerModal" aria-hidden="true">
+  <div class="modal-backdrop" id="layerBackdrop"></div>
+  <div class="modal-card modal-card-wide">
+    <button class="modal-close" id="layerClose" aria-label="Close">&times;</button>
+    <div id="layerModalBody"></div>
+  </div>
+</div>
+
 <nav class="rail" id="rail">
-  <a href="#top" data-rail="top">01 OVERVIEW</a>
-  <a href="#stats" data-rail="stats">02 DATA QUALITY</a>
-  <a href="#arch" data-rail="arch">03 ARCHITECTURE</a>
-  <a href="#loop" data-rail="loop">04 PIPELINE</a>
-  <a href="#tests" data-rail="tests">05 TEST SUITE</a>
-  <a href="#anomalies" data-rail="anomalies">06 ANOMALIES</a>
+  <a href="#stats" data-rail="stats">01 DATA QUALITY</a>
+  <a href="#arch" data-rail="arch">02 ARCHITECTURE</a>
+  <a href="#loop" data-rail="loop">03 PIPELINE</a>
+  <a href="#tests" data-rail="tests">04 TEST SUITE</a>
+  <a href="#anomalies" data-rail="anomalies">05 ANOMALIES</a>
 </nav>
 
 <nav id="nav">
   <div class="nav-in">
-    <a class="logo" href="index.html"><svg class="logo-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.2 4 L17.5 20"/><path d="M12.4 11.3 L6.8 20"/></svg><span class="logo-word">AKER</span><span class="logo-pill">AI</span></a>
-    <div class="nav-links links">
-      <a href="#stats">Data Quality</a>
-      <a href="#loop">Pipeline</a>
-      <a href="#tests">Tests</a>
-      <a href="#anomalies">Anomalies</a>
-    </div>
+    <a class="logo" href="dashboard.html"><svg class="logo-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.2 4 L17.5 20"/><path d="M12.4 11.3 L6.8 20"/></svg><span class="logo-word">AKER</span><span class="logo-pill">AI</span></a>
     <div class="nav-cta">
-      <a class="btn btn-ghost" href="index.html">&larr; Back to portfolio</a>
+      <a class="btn btn-ghost" href="dashboard.html">&larr; Back to dashboard</a>
     </div>
   </div>
 </nav>
 
-<section class="hero" id="top" style="min-height:60vh">
-  <div class="wrap hero-in">
-    <div class="eyebrow"><span class="dot"></span>HOW IT'S BUILT</div>
-    <h1 style="font-size:clamp(38px,7vw,80px)">The proof, <span class="grad-text">not just the pitch.</span></h1>
-    <p class="hero-sub">Schema, loader, tests, and the data quality issues actually caught. The technical build behind the portfolio view.</p>
-  </div>
-</section>
-
-<section class="stats" id="stats">
+<section class="stats" id="stats" style="padding-top:140px">
   <div class="wrap">
     <div class="sec-head reveal">
       <h2>Data Quality</h2>
@@ -60,64 +55,46 @@
   </div>
 </section>
 
-<!-- ───────── ARCHITECTURE — the real stack, bottom-up: foundation at the bottom of
-     the diagram, each layer feeding the one above it. Every node names a real file
-     or table; the reveal staggers foundation-first and pulses travel upward along
-     the connectors so the data visibly flows up the stack. ───────── -->
+<!-- ───────── ARCHITECTURE — the real stack, read top to bottom the way the data
+     actually flows: raw Excel first, finished surfaces last. Every box names a real
+     file or table; pulses run down the connectors, data flowing through the stack.
+     Cards stay light; each layer's full story lives in its Explore modal. ───────── -->
 <section class="arch" id="arch">
   <div class="orb orb-c" style="width:380px;height:380px;top:0;right:-120px"></div>
   <div class="wrap">
     <div class="sec-head reveal">
       <h2>Architecture</h2>
-      <p class="sec-sub">Bottom up. Every box is a real file.</p>
+      <p class="sec-sub">From raw files to finished product. Every box is a real file.</p>
     </div>
 
     <div class="arch-stack reveal stagger" id="archStack">
 
-      <div class="arch-layer" style="transition-delay:.75s">
-        <div class="arch-tag">SURFACES</div>
+      <div class="arch-layer" style="transition-delay:0s">
+        <div class="arch-tag">SOURCE DATA</div>
         <div class="arch-body">
-          <div class="arch-boxes">
-            <div class="arch-box"><b>AM Dashboard</b><span class="mono">web/dashboard.html</span></div>
-            <div class="arch-box"><b>AM Copilot</b><span class="mono">web/copilot.html</span></div>
+          <div class="arch-files">
+            <span class="arch-file"></span><span class="arch-file"></span><span class="arch-file"></span>
           </div>
-          <div class="arch-note">Two surfaces, one API. Neither has its own data path.</div>
+          <div class="arch-title">50 Excel files &middot; 25 Rent Roll + 25 Unit Availability</div>
+          <div class="arch-note">Every number downstream traces back here.</div>
+          <button class="arch-explore" data-layer="source">Explore this layer &rarr;</button>
         </div>
       </div>
 
-      <div class="arch-link fork" style="transition-delay:.68s">
-        <svg viewBox="0 0 120 34" aria-hidden="true"><path d="M60 34 V20 M60 20 C60 8 30 14 30 0 M60 20 C60 8 90 14 90 0"/></svg>
-        <span class="arch-pulse"></span>
-      </div>
+      <div class="arch-link" style="transition-delay:.1s"><span class="arch-line"></span><span class="arch-pulse"></span></div>
 
-      <div class="arch-layer ai" style="transition-delay:.6s">
-        <div class="arch-tag warn">AI LAYER</div>
+      <div class="arch-layer" style="transition-delay:.16s">
+        <div class="arch-tag">ETL / LOADER</div>
         <div class="arch-body">
-          <div class="arch-title"><span class="mono">api/chat.py</span> &middot; the only layer with an LLM in it</div>
-          <div class="arch-chips">
-            <span>agent loop</span><span>16 tool schemas</span><span>grounding check</span><span>Verify receipts</span>
-          </div>
-          <div class="arch-note">A thin slice on top of a normal API. Every tool is a wrapper around an endpoint below; the model never touches SQL or the files.</div>
+          <div class="arch-title"><span class="mono">scripts/load_data.py</span> &middot; parse, validate inline, write</div>
+          <div class="arch-note">Identity from filenames, charge totals re-checked live, idempotent re-runs.</div>
+          <button class="arch-explore" data-layer="etl">Explore this layer &rarr;</button>
         </div>
       </div>
 
-      <div class="arch-link" style="transition-delay:.53s"><span class="arch-line"></span><span class="arch-pulse"></span></div>
+      <div class="arch-link" style="transition-delay:.26s"><span class="arch-line"></span><span class="arch-pulse"></span></div>
 
-      <div class="arch-layer" style="transition-delay:.45s">
-        <div class="arch-tag">API LAYER</div>
-        <div class="arch-body">
-          <div class="arch-title"><span class="mono">api/main.py</span> &middot; pure SQL, no LLM anywhere</div>
-          <div class="arch-chips">
-            <span>/properties</span><span>/revenue/*</span><span>/occupancy/*</span><span>/leases/*</span>
-            <span>/delinquent</span><span>/anomalies</span><span>/metrics/*</span><span>/query</span>
-          </div>
-          <div class="arch-note"><span class="mono">api/db.py</span> opens one read-only SQLite connection per request.</div>
-        </div>
-      </div>
-
-      <div class="arch-link" style="transition-delay:.38s"><span class="arch-line"></span><span class="arch-pulse"></span></div>
-
-      <div class="arch-layer" style="transition-delay:.3s">
+      <div class="arch-layer" style="transition-delay:.32s">
         <div class="arch-tag">DATABASE</div>
         <div class="arch-body">
           <div class="arch-title">SQLite &middot; <span class="mono">db/aker.db</span> built from <span class="mono">db/schema.sql</span></div>
@@ -127,40 +104,52 @@
             <span class="er-node">tenancies</span><span class="er-arrow">&rarr;</span>
             <span class="er-node">charges</span>
           </div>
-          <div class="arch-chips dim">
-            <span>data_snapshots</span><span>charge_codes</span><span>data_quality_flags</span>
-            <span>unit_availability_snapshots</span><span>loader_errors</span>
-          </div>
-          <div class="arch-chips views">
-            <span>v_effective_revenue_by_property</span><span>v_delinquent_tenancies</span>
-            <span>v_lease_expirations</span><span>v_latest_rent_roll_snapshot</span>
-          </div>
+          <div class="arch-note">Snapshot-based: next month's files are new rows, not a redesign.</div>
+          <button class="arch-explore" data-layer="db">Explore this layer &rarr;</button>
         </div>
       </div>
 
-      <div class="arch-link" style="transition-delay:.23s"><span class="arch-line"></span><span class="arch-pulse"></span></div>
+      <div class="arch-link" style="transition-delay:.42s"><span class="arch-line"></span><span class="arch-pulse"></span></div>
 
-      <div class="arch-layer" style="transition-delay:.15s">
-        <div class="arch-tag">ETL / LOADER</div>
+      <div class="arch-layer" style="transition-delay:.48s">
+        <div class="arch-tag">API LAYER</div>
         <div class="arch-body">
-          <div class="arch-title"><span class="mono">scripts/load_data.py</span> &middot; parse, validate inline, write</div>
+          <div class="arch-title"><span class="mono">api/main.py</span> &middot; pure SQL, no LLM anywhere</div>
           <div class="arch-chips">
-            <span>rent_roll_parser.py</span><span>unit_availability_parser.py</span><span>filenames.py</span><span>etl/db.py</span>
+            <span>/properties</span><span>/revenue/*</span><span>/occupancy/*</span><span>/leases/*</span>
+            <span>/delinquent</span><span>/anomalies</span><span>/metrics/*</span><span>/query</span>
           </div>
-          <div class="arch-note">Charge totals re-summed live, missing charges and impossible dates flagged during the load, idempotent re-runs with rename reconciliation.</div>
+          <button class="arch-explore" data-layer="api">Explore this layer &rarr;</button>
         </div>
       </div>
 
-      <div class="arch-link" style="transition-delay:.08s"><span class="arch-line"></span><span class="arch-pulse"></span></div>
+      <div class="arch-link" style="transition-delay:.58s"><span class="arch-line"></span><span class="arch-pulse"></span></div>
 
-      <div class="arch-layer" style="transition-delay:0s">
-        <div class="arch-tag">SOURCE DATA</div>
+      <div class="arch-layer ai" style="transition-delay:.64s">
+        <div class="arch-tag warn">AI LAYER</div>
         <div class="arch-body">
-          <div class="arch-files">
-            <span class="arch-file"></span><span class="arch-file"></span><span class="arch-file"></span>
+          <div class="arch-title"><span class="mono">api/chat.py</span> &middot; the only layer with an LLM in it</div>
+          <div class="arch-chips">
+            <span>agent loop</span><span>16 tool schemas</span><span>grounding check</span><span>Verify receipts</span>
           </div>
-          <div class="arch-title">50 Excel files &middot; 25 Rent Roll + 25 Unit Availability</div>
-          <div class="arch-note">One pair per property program. Never edited by hand; every number downstream traces back here.</div>
+          <button class="arch-explore" data-layer="ai">Explore this layer &rarr;</button>
+        </div>
+      </div>
+
+      <div class="arch-link fork" style="transition-delay:.74s">
+        <svg viewBox="0 0 120 34" aria-hidden="true"><path d="M60 0 V14 M60 14 C60 26 30 20 30 34 M60 14 C60 26 90 20 90 34"/></svg>
+        <span class="arch-pulse"></span>
+      </div>
+
+      <div class="arch-layer" style="transition-delay:.8s">
+        <div class="arch-tag">SURFACES</div>
+        <div class="arch-body">
+          <div class="arch-boxes">
+            <div class="arch-box"><b>Dashboard</b><span class="mono">web/dashboard.html</span></div>
+            <div class="arch-box"><b>Aker AI Copilot</b><span class="mono">web/copilot.html</span></div>
+          </div>
+          <div class="arch-note">Two surfaces, one API. Neither has its own data path.</div>
+          <button class="arch-explore" data-layer="surfaces">Explore this layer &rarr;</button>
         </div>
       </div>
 
@@ -234,7 +223,7 @@
 <footer>
   <div class="wrap foot-in">
     <div class="foot-brand">
-      <a class="logo" href="index.html"><svg class="logo-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.2 4 L17.5 20"/><path d="M12.4 11.3 L6.8 20"/></svg><span class="logo-word">AKER</span><span class="logo-pill">AI</span></a>
+      <a class="logo" href="dashboard.html"><svg class="logo-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.2 4 L17.5 20"/><path d="M12.4 11.3 L6.8 20"/></svg><span class="logo-word">AKER</span><span class="logo-pill">AI</span></a>
       <p>Aker AI round 2 case study.</p>
     </div>
     <div class="foot-col">
