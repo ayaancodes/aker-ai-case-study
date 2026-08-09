@@ -133,6 +133,54 @@ h2{font-family:'Bricolage Grotesque';font-weight:700;font-size:clamp(28px,4.2vw,
 .pillar .tagline{font-family:'JetBrains Mono';font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--cyan)}
 
 /* LOOP — no paragraph */
+/* ───────── ARCHITECTURE STACK — foundation at the bottom, pulses flow upward ───────── */
+.arch{padding:64px 0}
+.arch-stack{max-width:760px;margin:0 auto;display:flex;flex-direction:column}
+.arch-layer{display:grid;grid-template-columns:120px 1fr;gap:18px;border:1px solid var(--line);
+  border-radius:16px;background:var(--glass);backdrop-filter:blur(10px);padding:18px 22px;
+  transition:border-color .25s}
+.arch-layer:hover{border-color:rgba(127,199,155,.3)}
+.arch-layer.ai{border-color:rgba(201,169,106,.35);background:rgba(201,169,106,.05)}
+.arch-layer.ai:hover{border-color:rgba(201,169,106,.55)}
+.arch-tag{font-family:'JetBrains Mono';font-size:9.5px;letter-spacing:.14em;color:var(--cyan);padding-top:3px}
+.arch-tag.warn{color:var(--warn)}
+.arch-title{font-size:13.5px;font-weight:600;margin-bottom:9px}
+.arch-title .mono{font-size:12px;color:var(--cyan);font-weight:500}
+.arch-layer.ai .arch-title .mono{color:var(--warn)}
+.arch-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.arch-chips span{font-family:'JetBrains Mono';font-size:10px;color:var(--dim);
+  border:1px solid var(--line);border-radius:99px;padding:3px 9px}
+.arch-chips.dim span{color:var(--faint)}
+.arch-chips.views span{color:var(--cyan);border-color:rgba(127,199,155,.25);background:rgba(127,199,155,.05)}
+.arch-note{font-size:12px;color:var(--dim);line-height:1.55}
+.arch-note .mono{font-size:11px;color:var(--cyan)}
+.arch-er{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px}
+.er-node{font-family:'JetBrains Mono';font-size:11px;color:var(--ink);border:1px solid rgba(127,199,155,.3);
+  background:rgba(127,199,155,.07);border-radius:8px;padding:5px 11px}
+.er-arrow{color:var(--faint);font-size:13px}
+.arch-boxes{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.arch-box{border:1px solid var(--line);border-radius:12px;padding:10px 16px;background:var(--void-2)}
+.arch-box b{display:block;font-family:'Bricolage Grotesque';font-weight:600;font-size:13.5px}
+.arch-box .mono{font-size:10px;color:var(--faint)}
+.arch-files{display:flex;gap:5px;margin-bottom:9px}
+.arch-file{width:26px;height:32px;border:1.5px solid rgba(127,199,155,.4);border-radius:4px;position:relative;background:var(--void-2)}
+.arch-file::before{content:"";position:absolute;top:6px;left:5px;right:5px;height:2px;background:rgba(127,199,155,.35);
+  box-shadow:0 5px 0 rgba(127,199,155,.25),0 10px 0 rgba(127,199,155,.15)}
+
+/* connectors: dashed vertical line with a pulse dot climbing it, forever -- data
+   flows UP this diagram. Fork connector splits the API into the two surfaces. */
+.arch-link{position:relative;height:34px;width:120px;margin:0 auto}
+.arch-line{position:absolute;left:50%;top:0;bottom:0;width:2px;transform:translateX(-50%);
+  background:repeating-linear-gradient(180deg,rgba(127,199,155,.45) 0 7px,transparent 7px 13px)}
+.arch-link.fork svg{position:absolute;inset:0;width:100%;height:100%;fill:none;
+  stroke:rgba(127,199,155,.45);stroke-width:2;stroke-dasharray:7 6}
+.arch-pulse{position:absolute;left:50%;bottom:0;width:7px;height:7px;border-radius:50%;
+  background:var(--cyan);box-shadow:0 0 10px var(--cyan);transform:translateX(-50%);
+  animation:arch-climb 2.2s ease-in-out infinite}
+@keyframes arch-climb{0%{bottom:-2px;opacity:0}15%{opacity:1}85%{opacity:1}100%{bottom:calc(100% - 5px);opacity:0}}
+@media (max-width:640px){.arch-layer{grid-template-columns:1fr;gap:8px}}
+@media (prefers-reduced-motion: reduce){.arch-pulse{animation:none;display:none}}
+
 .loop{padding:64px 0}
 .loop-track{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;position:relative;margin-top:10px}
 .loop-track::before{content:"";position:absolute;top:29px;left:11%;right:11%;height:2px;z-index:0;background:repeating-linear-gradient(90deg,rgba(127,199,155,.5) 0 9px,transparent 9px 17px)}
@@ -141,6 +189,39 @@ h2{font-family:'Bricolage Grotesque';font-weight:700;font-size:clamp(28px,4.2vw,
 .loop-dot svg{width:22px;height:22px;stroke:var(--cyan);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .loop-node h4{font-family:'Bricolage Grotesque';font-weight:600;font-size:16px}
 .loop-step{font-family:'JetBrains Mono';font-size:10px;letter-spacing:.14em;color:var(--cyan);margin-bottom:8px}
+
+/* pipeline deep dive: nodes are buttons; a pulse rides the track to the chosen
+   stage, then its panel opens below with the real content for that stage */
+button.loop-node{background:none;border:none;cursor:pointer;color:inherit;font:inherit}
+.loop-node.active .loop-dot{border-color:rgba(127,199,155,.55);box-shadow:0 0 0 7px var(--void),0 0 18px rgba(127,199,155,.35)}
+.loop-pulse{position:absolute;top:26px;left:12%;width:8px;height:8px;border-radius:50%;z-index:2;
+  background:var(--cyan);box-shadow:0 0 12px var(--cyan);opacity:0;transition:left .55s cubic-bezier(.2,.8,.2,1),opacity .2s}
+.loop-pulse.riding{opacity:1}
+.loop-detail{max-width:980px;margin:26px auto 0;overflow:hidden;max-height:0;opacity:0;
+  transition:max-height .5s cubic-bezier(.2,.8,.2,1),opacity .4s}
+.loop-detail.open{max-height:640px;opacity:1}
+.ld-card{border:1px solid var(--line);border-radius:18px;background:var(--glass);backdrop-filter:blur(12px);
+  padding:24px 26px;max-height:560px;overflow-y:auto}
+.ld-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+@media (max-width:820px){.ld-grid{grid-template-columns:1fr}}
+.ld-h{font-family:'JetBrains Mono';font-size:9.5px;letter-spacing:.13em;color:var(--cyan);margin-bottom:9px}
+.ld-code{font-family:'JetBrains Mono';font-size:10.5px;line-height:1.7;color:var(--dim);white-space:pre-wrap;
+  background:var(--void);border:1px solid var(--line-2);border-radius:10px;padding:12px 14px}
+.ld-code b{color:var(--cyan);font-weight:500}
+.ld-note{font-size:12px;color:var(--dim);line-height:1.55;margin-top:10px}
+.ld-note b{color:var(--ink)}
+.ld-row{display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-size:12px;color:var(--dim);
+  border-bottom:1px solid var(--line-2)}
+.ld-row:last-child{border-bottom:none}
+.ld-row .mono{color:var(--ink);font-size:11px}
+.ld-flag{border:1px solid rgba(201,169,106,.3);background:rgba(201,169,106,.06);border-radius:10px;
+  padding:10px 13px;font-size:12px;color:var(--dim);line-height:1.5;margin-bottom:8px}
+.ld-flag .mono{color:var(--warn);font-size:10px}
+.ld-arrow{text-align:center;color:var(--faint);font-size:16px;padding:6px 0}
+@media (prefers-reduced-motion: reduce){
+  .loop-pulse{transition:none}
+  .loop-detail{transition:none}
+}
 
 /* REVENUE / DONUT PANELS */
 .eq-sec{padding:64px 0}

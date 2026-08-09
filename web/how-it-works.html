@@ -16,9 +16,10 @@
 <nav class="rail" id="rail">
   <a href="#top" data-rail="top">01 OVERVIEW</a>
   <a href="#stats" data-rail="stats">02 DATA QUALITY</a>
-  <a href="#loop" data-rail="loop">03 PIPELINE</a>
-  <a href="#tests" data-rail="tests">04 TEST SUITE</a>
-  <a href="#anomalies" data-rail="anomalies">05 ANOMALIES</a>
+  <a href="#arch" data-rail="arch">03 ARCHITECTURE</a>
+  <a href="#loop" data-rail="loop">04 PIPELINE</a>
+  <a href="#tests" data-rail="tests">05 TEST SUITE</a>
+  <a href="#anomalies" data-rail="anomalies">06 ANOMALIES</a>
 </nav>
 
 <nav id="nav">
@@ -59,59 +60,148 @@
   </div>
 </section>
 
-<section class="pillars">
+<!-- ───────── ARCHITECTURE — the real stack, bottom-up: foundation at the bottom of
+     the diagram, each layer feeding the one above it. Every node names a real file
+     or table; the reveal staggers foundation-first and pulses travel upward along
+     the connectors so the data visibly flows up the stack. ───────── -->
+<section class="arch" id="arch">
   <div class="orb orb-c" style="width:380px;height:380px;top:0;right:-120px"></div>
   <div class="wrap">
     <div class="sec-head reveal">
       <h2>Architecture</h2>
+      <p class="sec-sub">Bottom up. Every box is a real file.</p>
     </div>
-    <div class="pillar-grid">
-      <div class="pillar reveal"><span class="corner-orb"></span>
-        <div class="icon-wrap"><div class="icon-in"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4.5"/></svg></div></div>
-        <h3>Data quality, enforced</h3>
-        <div class="tagline">FLAGGED AT LOAD TIME</div>
+
+    <div class="arch-stack reveal stagger" id="archStack">
+
+      <div class="arch-layer" style="transition-delay:.75s">
+        <div class="arch-tag">SURFACES</div>
+        <div class="arch-body">
+          <div class="arch-boxes">
+            <div class="arch-box"><b>AM Dashboard</b><span class="mono">web/dashboard.html</span></div>
+            <div class="arch-box"><b>AM Copilot</b><span class="mono">web/copilot.html</span></div>
+          </div>
+          <div class="arch-note">Two surfaces, one API. Neither has its own data path.</div>
+        </div>
       </div>
-      <div class="pillar reveal" style="transition-delay:.08s"><span class="corner-orb"></span>
-        <div class="icon-wrap"><div class="icon-in"><svg viewBox="0 0 24 24"><path d="M2 20h20M5 20V9m5 11V4m5 16v-8m5 8V7"/></svg></div></div>
-        <h3>Snapshot-based history</h3>
-        <div class="tagline">READY FOR MONTH TWO</div>
+
+      <div class="arch-link fork" style="transition-delay:.68s">
+        <svg viewBox="0 0 120 34" aria-hidden="true"><path d="M60 34 V20 M60 20 C60 8 30 14 30 0 M60 20 C60 8 90 14 90 0"/></svg>
+        <span class="arch-pulse"></span>
       </div>
-      <div class="pillar reveal" style="transition-delay:.16s"><span class="corner-orb"></span>
-        <div class="icon-wrap"><div class="icon-in"><svg viewBox="0 0 24 24"><path d="M17 2l4 4-4 4M21 6H8a5 5 0 00-5 5M7 22l-4-4 4-4M3 18h13a5 5 0 005-5"/></svg></div></div>
-        <h3>One API, every surface</h3>
-        <div class="tagline">DASHBOARD + CHATBOT, SAME SOURCE</div>
+
+      <div class="arch-layer ai" style="transition-delay:.6s">
+        <div class="arch-tag warn">AI LAYER</div>
+        <div class="arch-body">
+          <div class="arch-title"><span class="mono">api/chat.py</span> &middot; the only layer with an LLM in it</div>
+          <div class="arch-chips">
+            <span>agent loop</span><span>16 tool schemas</span><span>grounding check</span><span>Verify receipts</span>
+          </div>
+          <div class="arch-note">A thin slice on top of a normal API. Every tool is a wrapper around an endpoint below; the model never touches SQL or the files.</div>
+        </div>
       </div>
+
+      <div class="arch-link" style="transition-delay:.53s"><span class="arch-line"></span><span class="arch-pulse"></span></div>
+
+      <div class="arch-layer" style="transition-delay:.45s">
+        <div class="arch-tag">API LAYER</div>
+        <div class="arch-body">
+          <div class="arch-title"><span class="mono">api/main.py</span> &middot; pure SQL, no LLM anywhere</div>
+          <div class="arch-chips">
+            <span>/properties</span><span>/revenue/*</span><span>/occupancy/*</span><span>/leases/*</span>
+            <span>/delinquent</span><span>/anomalies</span><span>/metrics/*</span><span>/query</span>
+          </div>
+          <div class="arch-note"><span class="mono">api/db.py</span> opens one read-only SQLite connection per request.</div>
+        </div>
+      </div>
+
+      <div class="arch-link" style="transition-delay:.38s"><span class="arch-line"></span><span class="arch-pulse"></span></div>
+
+      <div class="arch-layer" style="transition-delay:.3s">
+        <div class="arch-tag">DATABASE</div>
+        <div class="arch-body">
+          <div class="arch-title">SQLite &middot; <span class="mono">db/aker.db</span> built from <span class="mono">db/schema.sql</span></div>
+          <div class="arch-er">
+            <span class="er-node">properties</span><span class="er-arrow">&rarr;</span>
+            <span class="er-node">units</span><span class="er-arrow">&rarr;</span>
+            <span class="er-node">tenancies</span><span class="er-arrow">&rarr;</span>
+            <span class="er-node">charges</span>
+          </div>
+          <div class="arch-chips dim">
+            <span>data_snapshots</span><span>charge_codes</span><span>data_quality_flags</span>
+            <span>unit_availability_snapshots</span><span>loader_errors</span>
+          </div>
+          <div class="arch-chips views">
+            <span>v_effective_revenue_by_property</span><span>v_delinquent_tenancies</span>
+            <span>v_lease_expirations</span><span>v_latest_rent_roll_snapshot</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="arch-link" style="transition-delay:.23s"><span class="arch-line"></span><span class="arch-pulse"></span></div>
+
+      <div class="arch-layer" style="transition-delay:.15s">
+        <div class="arch-tag">ETL / LOADER</div>
+        <div class="arch-body">
+          <div class="arch-title"><span class="mono">scripts/load_data.py</span> &middot; parse, validate inline, write</div>
+          <div class="arch-chips">
+            <span>rent_roll_parser.py</span><span>unit_availability_parser.py</span><span>filenames.py</span><span>etl/db.py</span>
+          </div>
+          <div class="arch-note">Charge totals re-summed live, missing charges and impossible dates flagged during the load, idempotent re-runs with rename reconciliation.</div>
+        </div>
+      </div>
+
+      <div class="arch-link" style="transition-delay:.08s"><span class="arch-line"></span><span class="arch-pulse"></span></div>
+
+      <div class="arch-layer" style="transition-delay:0s">
+        <div class="arch-tag">SOURCE DATA</div>
+        <div class="arch-body">
+          <div class="arch-files">
+            <span class="arch-file"></span><span class="arch-file"></span><span class="arch-file"></span>
+          </div>
+          <div class="arch-title">50 Excel files &middot; 25 Rent Roll + 25 Unit Availability</div>
+          <div class="arch-note">One pair per property program. Never edited by hand; every number downstream traces back here.</div>
+        </div>
+      </div>
+
     </div>
   </div>
 </section>
 
+<!-- ───────── PIPELINE — the 4-node strip stays as the summary; each node opens a
+     deep dive with REAL content from the real files (a real source row, the real
+     validation catches, the real schema, a real endpoint response). A pulse travels
+     the track to the chosen stage before the panel opens. ───────── -->
 <section class="loop" id="loop">
   <div class="wrap">
     <div class="sec-head reveal">
       <h2>Pipeline</h2>
+      <p class="sec-sub">Click a stage to open it up.</p>
     </div>
-    <div class="loop-track reveal stagger">
-      <div class="loop-node">
+    <div class="loop-track reveal stagger" id="loopTrack">
+      <span class="loop-pulse" id="loopPulse"></span>
+      <button class="loop-node" data-stage="ingest">
         <div class="loop-dot"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M4 9h16M9 4v16"/></svg></div>
         <div class="loop-step">01 &middot; INGEST</div>
         <h4>50 Excel files</h4>
-      </div>
-      <div class="loop-node">
+      </button>
+      <button class="loop-node" data-stage="validate">
         <div class="loop-dot"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
         <div class="loop-step">02 &middot; VALIDATE</div>
         <h4>Checked live</h4>
-      </div>
-      <div class="loop-node">
+      </button>
+      <button class="loop-node" data-stage="structure">
         <div class="loop-dot"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12h8M12 8v8"/></svg></div>
         <div class="loop-step">03 &middot; STRUCTURE</div>
         <h4>Normalized schema</h4>
-      </div>
-      <div class="loop-node">
+      </button>
+      <button class="loop-node" data-stage="understand">
         <div class="loop-dot"><svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg></div>
         <div class="loop-step">04 &middot; UNDERSTAND</div>
         <h4>API + chatbot</h4>
-      </div>
+      </button>
     </div>
+    <div class="loop-detail" id="loopDetail"></div>
   </div>
 </section>
 

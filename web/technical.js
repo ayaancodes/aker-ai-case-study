@@ -58,11 +58,143 @@ function renderAnomalies(anomalies) {
   `).join("");
 }
 
+/* ── pipeline deep dives. Every string below is real and was verified against the
+   file it names: the 176r row is row 7 of that exact workbook, the regexes are
+   copied from scripts/etl/filenames.py, the flag text is the actual detail stored
+   in data_quality_flags, the schema snippet is db/schema.sql's tenancies table,
+   and the JSON is the live /revenue/portfolio response. Do not "improve" these
+   numbers without re-checking the source. ── */
+const STAGE_CONTENT = {
+  ingest: `
+    <div class="ld-grid">
+      <div>
+        <div class="ld-h">FILENAME &rarr; IDENTITY &middot; scripts/etl/filenames.py</div>
+        <div class="ld-code">ResAnalytics_Rent_Roll_with_Lease_Charges_<b>176r</b>.xlsx
+
+_CODE_RE  = r"_([A-Za-z0-9]+)\\.xlsx$"   &rarr; "<b>176r</b>"
+_SPLIT_RE = r"^(\\d+)([A-Za-z]*)$"        &rarr; "<b>176</b>" + "<b>r</b>"
+
+PROGRAM_SUFFIX_MAP = { r: residential, a: affordable,
+                       c: commercial, land: land }</div>
+        <div class="ld-note">No hardcoded property list anywhere. Identity comes from the filename pattern, so 25 files or 1,000 files load the same way.</div>
+      </div>
+      <div>
+        <div class="ld-h">A REAL ROW &middot; 176r, row 7</div>
+        <div class="ld-row"><span>Unit</span><span class="mono">1101 &middot; 176mxA01 &middot; 635 sq ft</span></div>
+        <div class="ld-row"><span>Resident</span><span class="mono">t176r001 &middot; Resident 1</span></div>
+        <div class="ld-row"><span>Market rent</span><span class="mono">$1,711</span></div>
+        <div class="ld-row"><span>Lease</span><span class="mono">2025-05-23 &rarr; 2026-05-22</span></div>
+        <div class="ld-row"><span>Charge lines</span><span class="mono">none &middot; Total 0</span></div>
+        <div class="ld-note">A real resident with real rent and <b>zero recorded charges</b>. This exact pattern, found at load time, becomes the missing_charges flag in the next stage.</div>
+      </div>
+    </div>`,
+  validate: `
+    <div class="ld-h">CHECKS THAT RUN DURING THE LOAD &middot; scripts/load_data.py &middot; real catches shown</div>
+    <div class="ld-flag"><span class="mono">charge_total_reconciliation</span><br>
+      Every unit's charge lines are re-summed against the file's own stated Total, live. 4,106 tenancies, 9,177 charge lines, <b>zero mismatches</b>.</div>
+    <div class="ld-flag"><span class="mono">missing_charges &middot; property 175</span><br>
+      373 of 375 occupied/notice tenancies (99.5%) have zero recorded charge lines. Revenue for this property is understated in the source file itself; the file's own footer says lease_charges = 0.00.</div>
+    <div class="ld-flag"><span class="mono">implausible_dates &middot; property 143</span><br>
+      Unit 1-114 carries a lease expiring <b>2626-06-30</b>, six hundred years out. An obvious typo for 2026, caught because it is more than 30 years past the as-of date.</div>
+    <div class="ld-flag"><span class="mono">unit_availability_mismatch &middot; property 153</span><br>
+      The unit availability file states total_units = 0 while the matching rent roll has 7 real unit rows. Stale export, flagged automatically.</div>
+    <div class="ld-note">Every catch becomes a queryable row in <b>data_quality_flags</b>, not a note in a doc. The dashboard's Watchpoints and the copilot's answers read from the same table.</div>`,
+  structure: `
+    <div class="ld-grid">
+      <div>
+        <div class="ld-h">THE TABLE IT BECOMES &middot; db/schema.sql</div>
+        <div class="ld-code">CREATE TABLE <b>tenancies</b> (
+  tenancy_id   INTEGER PRIMARY KEY,
+  snapshot_id  &rarr; data_snapshots,
+  unit_id      &rarr; units,
+  section      CHECK (current | future_applicant),
+  <b>status</b>       CHECK (occupied | vacant |
+                      model | down | notice),
+  market_rent, resident_deposit,
+  move_in, lease_expiration, move_out,
+  balance
+);</div>
+      </div>
+      <div>
+        <div class="ld-h">WHAT GOT NORMALIZED ON THE WAY IN</div>
+        <div class="ld-row"><span>"VACANT" typed in the resident field</span><span class="mono">&rarr; status enum</span></div>
+        <div class="ld-row"><span>MM/DD/YYYY header dates</span><span class="mono">&rarr; ISO dates</span></div>
+        <div class="ld-row"><span>Nested unit + charge rows</span><span class="mono">&rarr; tenancies + charges</span></div>
+        <div class="ld-row"><span>25 files, name spellings vary</span><span class="mono">&rarr; 15 properties by code</span></div>
+        <div class="ld-note">Snapshot-based on purpose: loading next month's files is just more <b>data_snapshots</b> rows, not a redesign. Charges stay line-item level so revenue can be recategorized without reloading.</div>
+      </div>
+    </div>`,
+  understand: `
+    <div class="ld-grid">
+      <div>
+        <div class="ld-h">THE ENDPOINT &middot; GET /revenue/portfolio</div>
+        <div class="ld-code">{
+  "total_gross_revenue":  <b>7703949.39</b>,
+  "total_concessions":    <b>-144087.14</b>,
+  "total_net_effective_revenue": <b>7559862.25</b>,
+  "by_property": [
+    { "property_id": "144",
+      "canonical_name": "Winners Circle",
+      "net_effective_revenue": 1636735.63 },
+    ...14 more
+  ]
+}</div>
+      </div>
+      <div>
+        <div class="ld-h">THE SAME DATA, EVERY SURFACE</div>
+        <div class="ld-row"><span>Dashboard KPI card</span><span class="mono">$7,559,862</span></div>
+        <div class="ld-arrow">same function, one hop down</div>
+        <div class="ld-row"><span>Copilot tool <span class="mono">portfolio_revenue</span></span><span class="mono">"$7.56M"</span></div>
+        <div class="ld-note">The copilot's tools are direct calls into the same handler functions the dashboard fetches. No second data path, no model-side math: if the number is wrong on one surface it is wrong on both, and the tests catch it once.</div>
+      </div>
+    </div>`,
+};
+
+/* pulse rides the track to the clicked node, then that stage's panel opens */
+function initPipelineDive() {
+  const track = document.getElementById("loopTrack");
+  const pulse = document.getElementById("loopPulse");
+  const detail = document.getElementById("loopDetail");
+  if (!track) return;
+  const nodes = [...track.querySelectorAll(".loop-node")];
+  let current = null;
+
+  nodes.forEach((node) => {
+    node.addEventListener("click", () => {
+      const stage = node.dataset.stage;
+      if (current === stage) {
+        detail.classList.remove("open");
+        node.classList.remove("active");
+        pulse.classList.remove("riding");
+        current = null;
+        return;
+      }
+      nodes.forEach((n) => n.classList.toggle("active", n === node));
+      current = stage;
+
+      // ride the pulse along the track to this node's center, then open
+      const trackRect = track.getBoundingClientRect();
+      const dotRect = node.querySelector(".loop-dot").getBoundingClientRect();
+      const targetPct = ((dotRect.left + dotRect.width / 2 - trackRect.left) / trackRect.width) * 100;
+      pulse.classList.add("riding");
+      pulse.style.left = targetPct + "%";
+
+      const open = () => {
+        detail.innerHTML = `<div class="ld-card">${STAGE_CONTENT[stage]}</div>`;
+        detail.classList.add("open");
+      };
+      if (REDUCED) open();
+      else setTimeout(open, 480);
+    });
+  });
+}
+
 async function init() {
   const [stats, anomalies] = await Promise.all([api("/stats"), api("/anomalies")]);
   renderStats(stats);
   renderTerminal();
   renderAnomalies(anomalies);
+  initPipelineDive();
   observeReveals();
 }
 
