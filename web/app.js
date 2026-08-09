@@ -58,16 +58,18 @@ async function init() {
 
   const sorted = [...revenue.by_property].sort((a, b) => b.net_effective_revenue - a.net_effective_revenue);
 
-  // the one-line live pulse under the greeting -- real numbers, same API the dashboard uses
-  document.getElementById("portfolioPulse").textContent =
-    `${revenue.by_property.length} PROPERTIES · ${fmtMoney(revenue.total_net_effective_revenue)} NET EFFECTIVE · ` +
-    `${occupancy.pct_occ != null ? occupancy.pct_occ.toFixed(1) + "%" : "—"} OCCUPIED`;
+  // the live pulse under the greeting, as fact chips -- real numbers, same API the
+  // dashboard uses
+  document.getElementById("portfolioPulse").innerHTML = [
+    `<b>${revenue.by_property.length}</b>&nbsp;PROPERTIES`,
+    `<b>${fmtMoney(revenue.total_net_effective_revenue)}</b>&nbsp;NET EFFECTIVE`,
+    `<b>${occupancy.pct_occ != null ? occupancy.pct_occ.toFixed(1) + "%" : "—"}</b>&nbsp;OCCUPIED`,
+  ].map((t) => `<span class="dash-chip">${t}</span>`).join("");
 
   renderTicker(sorted);
 
   const first = await api(`/properties/${sorted[0].property_id}`);
-  document.getElementById("asOfNote").textContent =
-    `AS OF ${first?.latest_as_of_date?.rent_roll || "—"}`;
+  startLiveClock(document.getElementById("asOfNote"), first?.latest_as_of_date?.rent_roll || "—");
 }
 
 function renderTicker(sorted) {

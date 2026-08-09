@@ -197,3 +197,26 @@ def test_query_endpoint_guardrails(client):
     # so instead prove the endpoint result is capped
     big = client.post("/query", json={"sql": "SELECT tenancy_id FROM tenancies"}).json()
     assert big["row_count"] <= 200
+
+
+def test_revenue_bridge_ties_out(client):
+    """Every step of the bridge is a real number and the arithmetic closes exactly:
+    gross potential - vacancy = billable; billable - gap = billed base; billed base
+    + other = gross revenue; gross + concessions = net effective. The gap step must
+    equal the documented missing-charges figure."""
+    b = client.get("/metrics/revenue-bridge").json()
+    assert abs(b["gross_potential_rent"] - b["vacancy_loss"] - b["billable_market_rent"]) < 0.01
+    assert abs(b["billable_market_rent"] - b["missing_charge_gap"] - b["billed_rent_base"]) < 0.01
+    assert abs(b["billed_rent_base"] + b["other_income_and_variance"] - b["gross_revenue"]) < 0.01
+    assert abs(b["gross_revenue"] + b["concessions"] - b["net_effective_revenue"]) < 0.01
+    assert b["missing_charge_gap"] == 2045964.0
+
+
+def test_delinquent_rows_carry_program_type(client):
+    """Feeds the Risk tab's commercial vs residential split -- the one commercial
+    balance ($178K) must be separable from residential risk."""
+    rows = client.get("/delinquent").json()["rows"]
+    programs = {r["program_type"] for r in rows}
+    assert {"residential", "commercial", "affordable"} <= programs
+    commercial = [r for r in rows if r["program_type"] == "commercial"]
+    assert max(r["balance"] for r in commercial) == 178806.41

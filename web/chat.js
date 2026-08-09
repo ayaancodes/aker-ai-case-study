@@ -22,7 +22,7 @@ const CHARS_PER_SEC = 75;
 const TYPE_TICK_MS = 33;
 
 api("/leases/expiring?days=0").then((d) => {
-  asOfNote.textContent = `AS OF ${d.reference_date}`;
+  startLiveClock(asOfNote, d.reference_date);
 }).catch(() => {});
 
 /* Scroll model used by every real chat app: a "following" flag, not a per-tick
@@ -391,13 +391,10 @@ async function sendMessage(forcedText) {
       }
     }
 
-    if (groundingUnverified?.length) {
-      const warn = document.createElement("div");
-      warn.className = "copilot-grounding-warn";
-      warn.textContent = `Could not verify against tool data: ${groundingUnverified.join(", ")}`;
-      lastEl.after(warn);
-      lastEl = warn;
-    }
+    // grounding result intentionally NOT rendered: the flag fired on legitimate
+    // derived figures (e.g. "15%" the model computed from two real numbers) and read
+    // as an error to users. Still checked and logged server-side; Verify is the
+    // user-facing trust surface.
 
     // Verify: the receipt for this whole turn -- every tool called, with the exact
     // arguments (and SQL where applicable), in a small modal

@@ -33,7 +33,7 @@ async function init() {
   renderDelinquentList("delinquentList", delinquentRows);
   renderLeaseList("leaseList", leases.leases);
 
-  document.getElementById("asOfNote").textContent = `AS OF ${leases.reference_date || "—"}`;
+  startLiveClock(document.getElementById("asOfNote"), leases.reference_date || "—");
 
   document.getElementById("dashSearch").addEventListener("input", (e) => {
     renderSidebar(sortedByRevenue, e.target.value);
@@ -42,15 +42,119 @@ async function init() {
 
   // tab chips switch the portfolio panes; data is already rendered, pure show/hide
   document.getElementById("dashTabs").addEventListener("click", (e) => {
-    const tab = e.target.closest(".dash-tab");
+    const tab = e.target.closest("#dashTabs .dash-tab");
     if (!tab) return;
-    document.querySelectorAll(".dash-tab").forEach((t) => t.classList.toggle("on", t === tab));
+    document.querySelectorAll("#dashTabs .dash-tab").forEach((t) => t.classList.toggle("on", t === tab));
     document.querySelectorAll(".dash-tab-pane").forEach((p) => {
       p.style.display = p.dataset.pane === tab.dataset.tab ? "" : "none";
     });
   });
 
+  // revenue bridge waterfall, Financial tab
+  const bridge = await api("/metrics/revenue-bridge");
+  const bridgeCv = document.getElementById("bridgeChart");
+  animateOnceVisible(bridgeCv, (progress) => drawBridge(bridgeCv, bridge, progress));
+
+  // commercial vs residential split on the Risk tab -- one commercial unit carries
+  // a $178K balance that would otherwise swamp all residential risk in one list
+  renderDelinquentSplit("");
+  document.getElementById("programTabs").addEventListener("click", (e) => {
+    const tab = e.target.closest("#programTabs .dash-tab");
+    if (!tab) return;
+    document.querySelectorAll("#programTabs .dash-tab").forEach((t) => t.classList.toggle("on", t === tab));
+    renderDelinquentSplit(tab.dataset.program);
+  });
+
   observeReveals();
+}
+
+function renderDelinquentSplit(program) {
+  const rows = program
+    ? PORTFOLIO.delinquent.filter((r) => r.program_type === program)
+    : PORTFOLIO.delinquent;
+  renderDelinquentList("delinquentList", rows);
+  const total = rows.reduce((s, r) => s + r.balance, 0);
+  document.getElementById("delinquentSub").textContent =
+    `${rows.length} tenancies · ${fmtMoney(total)} owed`;
+}
+
+/* CFO-style waterfall: gross potential rent down to net effective revenue. Floating
+   bars on a running total; the missing-charge gap is drawn amber because it is the
+   data quality finding expressed as a financial line item. */
+function drawBridge(cv, b, progress = 1) {
+  const steps = [
+    { label: "GROSS POTENTIAL", value: b.gross_potential_rent, type: "total" },
+    { label: "VACANCY", value: -b.vacancy_loss, type: "loss" },
+    { label: "MISSING CHARGES", value: -b.missing_charge_gap, type: "gap" },
+    { label: "OTHER INCOME", value: b.other_income_and_variance, type: "gain" },
+    { label: "CONCESSIONS", value: b.concessions, type: "loss" },
+    { label: "NET EFFECTIVE", value: b.net_effective_revenue, type: "total" },
+  ];
+  const { ctx, w, h } = fitCanvas(cv);
+  ctx.clearRect(0, 0, w, h);
+  const padTop = 34, padBottom = 34;
+  const plotH = h - padTop - padBottom;
+  const max = b.gross_potential_rent || 1;
+  const slot = w / steps.length;
+  const barW = Math.min(84, slot * 0.55);
+  const y = (v) => padTop + plotH - (v / max) * plotH * progress;
+
+  const colors = {
+    total: ["#7FC79B", "#3E6B4F"],
+    loss: ["#E2836F", "#a85843"],
+    gap: ["#C9A96A", "#8a6f3e"],
+    gain: ["#D8EFDF", "#7FC79B"],
+  };
+
+  let running = 0;
+  let prevRightY = null;
+  steps.forEach((s, i) => {
+    const x = i * slot + (slot - barW) / 2;
+    let top, bottom;
+    if (s.type === "total") {
+      top = y(s.value); bottom = y(0);
+      running = s.value;
+    } else {
+      const from = running;
+      running += s.value;
+      top = y(Math.max(from, running));
+      bottom = y(Math.min(from, running));
+      if (bottom - top < 2) bottom = top + 2;
+    }
+    const grad = ctx.createLinearGradient(0, top, 0, bottom);
+    const [c1, c2] = colors[s.type];
+    grad.addColorStop(0, c1); grad.addColorStop(1, c2);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.roundRect(x, top, barW, Math.max(bottom - top, 2), 4);
+    ctx.fill();
+
+    // connector from the previous bar's landing level
+    if (prevRightY != null) {
+      ctx.strokeStyle = "rgba(154,164,157,.35)";
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(x - (slot - barW) + barW / 8, prevRightY);
+      ctx.lineTo(x, prevRightY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    prevRightY = y(running);
+
+    if (progress > 0.65) {
+      ctx.globalAlpha = Math.min(1, (progress - 0.65) / 0.35);
+      ctx.fillStyle = "#EDEBE4";
+      ctx.font = "600 11px 'JetBrains Mono'";
+      ctx.textAlign = "center";
+      const valText = (s.value < 0 ? "-" : "") + "$" + Math.round(Math.abs(s.value) / 1000).toLocaleString() + "K";
+      ctx.fillText(s.type === "total" ? "$" + (s.value / 1e6).toFixed(2) + "M" : valText, x + barW / 2, top - 8);
+      ctx.fillStyle = "#5E675F";
+      ctx.font = "500 8.5px 'JetBrains Mono'";
+      ctx.fillText(s.label, x + barW / 2, h - 12);
+      ctx.globalAlpha = 1;
+      ctx.textAlign = "left";
+    }
+  });
 }
 
 /* fact chips + Healthy/Watch status, all real: watch = properties carrying at least
@@ -397,11 +501,8 @@ function renderUnitsTable(units) {
   PROPERTY_UNITS = units;
 
   const statuses = [...new Set(units.map((u) => u.status || "vacant"))].sort();
-  const types = [...new Set(units.map((u) => u.unit_type).filter(Boolean))].sort();
   document.getElementById("unitStatusFilter").innerHTML =
     `<option value="">All statuses</option>` + statuses.map((s) => `<option value="${s}">${s}</option>`).join("");
-  document.getElementById("unitTypeFilter").innerHTML =
-    `<option value="">All types</option>` + types.map((t) => `<option value="${t}">${t}</option>`).join("");
   document.getElementById("unitSearch").value = "";
 
   applyUnitFilters();
@@ -410,11 +511,9 @@ function renderUnitsTable(units) {
 function applyUnitFilters() {
   const q = document.getElementById("unitSearch").value.trim().toLowerCase();
   const status = document.getElementById("unitStatusFilter").value;
-  const type = document.getElementById("unitTypeFilter").value;
 
   const filtered = PROPERTY_UNITS.filter((u) => {
     if (status && (u.status || "vacant") !== status) return false;
-    if (type && u.unit_type !== type) return false;
     if (q && !(
       u.unit_number.toLowerCase().includes(q) ||
       (u.resident_name || "").toLowerCase().includes(q)
@@ -444,7 +543,6 @@ function applyUnitFilters() {
 
 document.getElementById("unitSearch").addEventListener("input", applyUnitFilters);
 document.getElementById("unitStatusFilter").addEventListener("change", applyUnitFilters);
-document.getElementById("unitTypeFilter").addEventListener("change", applyUnitFilters);
 
 /* ── unit detail modal: click a row -> /units/{id} -> tenancy facts + real charge
    lines. No history section on purpose (one snapshot loaded); if a billable unit has

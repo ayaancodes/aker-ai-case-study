@@ -241,6 +241,7 @@ SELECT
     u.property_id,
     p.canonical_name,
     u.unit_number,
+    u.program_type,
     t.resident_name,
     t.balance
 FROM tenancies t

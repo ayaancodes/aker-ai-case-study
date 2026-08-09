@@ -303,7 +303,7 @@ def delinquent_tenancies(
     conn=Depends(get_connection),
 ):
     query = """SELECT tenancy_id, unit_id, property_id, canonical_name, unit_number,
-                      resident_name, balance
+                      program_type, resident_name, balance
                FROM v_delinquent_tenancies
                WHERE balance > ?"""
     params = [min_balance]
@@ -444,6 +444,65 @@ def property_units(
     if limit is not None:
         rows = rows[:limit]
     return {"total_count": total, "units": [dict(r) for r in rows]}
+
+
+@app.get("/metrics/revenue-bridge")
+def revenue_bridge(conn=Depends(get_connection)):
+    """The CFO-style bridge from gross potential rent down to net effective revenue,
+    every step a real number from the loaded data:
+      gross potential (market rent, every current-section unit)
+      - vacancy loss (market rent parked in vacant/model/down units)
+      = billable market rent (occupied + notice)
+      - missing-charge gap (billable tenancies with ZERO recorded charge lines --
+        the portfolio's known data quality finding, as a financial line item)
+      = billed rent base
+      + other income & billing variance (ancillary, fees, subsidies, and the gap
+        between stated market rent and what's actually billed on billed tenancies)
+      = gross revenue (actual recorded charges)
+      - concessions
+      = net effective revenue
+    The 'other' step is a residual and is labeled as such -- it makes the bridge tie
+    out exactly to recorded revenue instead of pretending market rent bills itself."""
+    row = conn.execute(
+        """SELECT
+             SUM(t.market_rent) AS gross_potential,
+             SUM(CASE WHEN t.status IN ('vacant','model','down') THEN t.market_rent ELSE 0 END) AS vacancy_loss,
+             SUM(CASE WHEN t.status IN ('occupied','notice')
+                       AND NOT EXISTS (SELECT 1 FROM charges c WHERE c.tenancy_id = t.tenancy_id)
+                      THEN t.market_rent ELSE 0 END) AS missing_charge_gap
+           FROM tenancies t
+           JOIN units u ON u.unit_id = t.unit_id
+           JOIN data_snapshots s ON s.snapshot_id = t.snapshot_id
+           JOIN v_latest_rent_roll_snapshot latest
+               ON latest.property_id = u.property_id AND latest.as_of_date = s.as_of_date
+           WHERE t.section = 'current'"""
+    ).fetchone()
+    totals = conn.execute(
+        """SELECT SUM(gross_revenue) AS gross_revenue, SUM(concessions) AS concessions,
+                  SUM(net_effective_revenue) AS net_effective
+           FROM v_effective_revenue_by_property"""
+    ).fetchone()
+
+    gross_potential = round(row["gross_potential"] or 0, 2)
+    vacancy_loss = round(row["vacancy_loss"] or 0, 2)
+    billable = round(gross_potential - vacancy_loss, 2)
+    gap = round(row["missing_charge_gap"] or 0, 2)
+    billed_base = round(billable - gap, 2)
+    gross_revenue = round(totals["gross_revenue"] or 0, 2)
+    other_income = round(gross_revenue - billed_base, 2)
+    concessions = round(totals["concessions"] or 0, 2)
+    net_effective = round(totals["net_effective"] or 0, 2)
+    return {
+        "gross_potential_rent": gross_potential,
+        "vacancy_loss": vacancy_loss,
+        "billable_market_rent": billable,
+        "missing_charge_gap": gap,
+        "billed_rent_base": billed_base,
+        "other_income_and_variance": other_income,
+        "gross_revenue": gross_revenue,
+        "concessions": concessions,
+        "net_effective_revenue": net_effective,
+    }
 
 
 @app.get("/metrics/rent-summary")

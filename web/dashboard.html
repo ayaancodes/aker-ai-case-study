@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard &mdash; Aker Portfolio Terminal</title>
+<title>AKER AI &middot; AM Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -26,10 +26,7 @@
 
 <nav id="nav">
   <div class="nav-in">
-    <a class="logo" href="index.html">
-      <span class="logo-mark">A</span>
-      <span class="logo-name">Aker <em>Terminal</em></span>
-    </a>
+    <a class="logo" href="index.html"><svg class="logo-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.2 4 L17.5 20"/><path d="M12.4 11.3 L6.8 20"/></svg><span class="logo-word">AKER</span><span class="logo-pill">AI</span></a>
     <div class="nav-links links">
       <a href="index.html">Home</a>
       <a href="how-it-works.html">How it's built</a>
@@ -76,33 +73,39 @@
       </div>
 
       <div class="dash-tab-pane" data-pane="overview">
-        <div class="dash-section dash-grid-hero">
-          <div class="dash-grid-hero-left">
-            <div class="dash-section dash-grid-2" style="margin-bottom:18px">
-              <div class="eq-panel">
-                <div class="eq-head">
-                  <div><div class="eq-title">Net effective revenue by property</div><div class="eq-sub">scroll for all 15</div></div>
-                </div>
-                <div class="eq-body scrolly"><canvas id="revenueChart"></canvas><div class="eq-tip" id="revenueTip"></div></div>
-              </div>
-              <div class="eq-panel">
-                <div class="eq-head">
-                  <div><div class="eq-title">Occupancy by property</div><div class="eq-sub">scroll for all 15</div></div>
-                </div>
-                <div class="eq-body scrolly"><canvas id="occupancyChart"></canvas><div class="eq-tip" id="occupancyTip"></div></div>
-              </div>
-            </div>
-          </div>
-          <div class="eq-panel signals-card">
+        <div class="dash-section dash-grid-2">
+          <div class="eq-panel">
             <div class="eq-head">
-              <div><div class="eq-title">AM Copilot signals</div><div class="eq-sub">from the load-time quality checks</div></div>
+              <div><div class="eq-title">Net effective revenue by property</div><div class="eq-sub">scroll for all 15</div></div>
             </div>
-            <div class="signals-body" id="signalsBody"></div>
+            <div class="eq-body scrolly"><canvas id="revenueChart"></canvas><div class="eq-tip" id="revenueTip"></div></div>
+          </div>
+          <div class="eq-panel">
+            <div class="eq-head">
+              <div><div class="eq-title">Occupancy by property</div><div class="eq-sub">scroll for all 15</div></div>
+            </div>
+            <div class="eq-body scrolly"><canvas id="occupancyChart"></canvas><div class="eq-tip" id="occupancyTip"></div></div>
+          </div>
+        </div>
+        <div class="dash-section">
+          <div class="eq-panel">
+            <div class="eq-head">
+              <div><div class="eq-title">Watchpoints</div><div class="eq-sub">from the load-time quality checks</div></div>
+            </div>
+            <div class="signals-body signals-row" id="signalsBody"></div>
           </div>
         </div>
       </div>
 
       <div class="dash-tab-pane" data-pane="financial" style="display:none">
+        <div class="dash-section">
+          <div class="eq-panel">
+            <div class="eq-head">
+              <div><div class="eq-title">Revenue bridge</div><div class="eq-sub">gross potential rent to net effective, every step from the loaded data</div></div>
+            </div>
+            <div class="eq-body"><canvas id="bridgeChart" style="height:280px"></canvas></div>
+          </div>
+        </div>
         <div class="dash-section dash-grid-2">
           <div class="eq-panel">
             <div class="eq-head">
@@ -126,9 +129,17 @@
       </div>
 
       <div class="dash-tab-pane" data-pane="risk" style="display:none">
+        <!-- commercial vs residential split: one commercial unit carries a $178K
+             balance that would otherwise visually swamp all residential risk -->
+        <div class="dash-tabs mini-tabs" id="programTabs">
+          <button class="dash-tab on" data-program="">All programs</button>
+          <button class="dash-tab" data-program="residential">Residential</button>
+          <button class="dash-tab" data-program="affordable">Affordable</button>
+          <button class="dash-tab" data-program="commercial">Commercial</button>
+        </div>
         <div class="dash-section risk-grid">
           <div class="eq-panel">
-            <div class="eq-head"><div><div class="eq-title">Delinquent balances</div></div></div>
+            <div class="eq-head"><div><div class="eq-title">Delinquent balances</div><div class="eq-sub" id="delinquentSub"></div></div></div>
             <div class="risk-list" id="delinquentList"></div>
           </div>
           <div class="eq-panel">
@@ -156,7 +167,6 @@
             <div class="units-tools">
               <input type="text" id="unitSearch" placeholder="Find unit or resident&hellip;" autocomplete="off">
               <select id="unitStatusFilter"><option value="">All statuses</option></select>
-              <select id="unitTypeFilter"><option value="">All types</option></select>
             </div>
           </div>
           <div class="units-table-wrap">

@@ -61,10 +61,12 @@ section{position:relative}
 nav{position:fixed;top:0;left:0;right:0;z-index:50;backdrop-filter:blur(16px);background:rgba(5,5,7,.82);border-bottom:1px solid transparent;transition:border-color .3s}
 nav.scrolled{border-bottom-color:var(--line)}
 .nav-in{max-width:1180px;margin:0 auto;padding:16px 28px;display:flex;align-items:center;gap:30px}
-.logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink)}
-.logo-mark{width:30px;height:30px;border-radius:9px;background:var(--grad);display:grid;place-items:center;font-family:'Bricolage Grotesque';font-weight:700;font-size:14px;color:#06130B;flex:none}
-.logo-name{font-family:'Bricolage Grotesque';font-weight:600;font-size:17px}
-.logo-name em{font-style:normal;color:var(--ink)}
+/* wordmark after Aker AI's own lockup: lambda-style glyph, AKER, an AI pill */
+.logo{display:flex;align-items:center;gap:9px;text-decoration:none;color:var(--ink)}
+.logo-glyph{width:21px;height:21px;stroke:var(--ink);fill:none;stroke-width:2.1;stroke-linecap:round;flex:none}
+.logo-word{font-family:'Bricolage Grotesque';font-weight:700;font-size:15.5px;letter-spacing:.16em}
+.logo-pill{font-family:'Bricolage Grotesque';font-weight:700;font-size:10px;letter-spacing:.05em;
+  background:var(--ink);color:#0B0D0C;border-radius:99px;padding:2.5px 8px;flex:none}
 .nav-links{display:flex;gap:26px;margin-left:14px}
 .nav-links a{color:var(--dim);text-decoration:none;font-size:13.5px;font-weight:500;transition:color .15s}
 .nav-links a:hover{color:var(--ink)}
@@ -85,6 +87,9 @@ nav.scrolled{border-bottom-color:var(--line)}
 h1{font-family:'Bricolage Grotesque';font-weight:800;font-size:clamp(52px,10vw,128px);line-height:.98;letter-spacing:-.035em;margin-bottom:20px}
 .hero-sub{max-width:520px;margin:0 auto 26px;color:var(--dim);font-size:clamp(14px,1.4vw,16px)}
 .hero-ctas{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-bottom:26px}
+.hero-chips{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:0 auto 28px}
+.hero-chips .dash-chip{font-family:'JetBrains Mono';font-size:11.5px;padding:7px 14px;backdrop-filter:blur(6px)}
+.hero-chips .dash-chip b{color:var(--ink);font-weight:600}
 .hero-note{display:inline-flex;align-items:center;gap:8px;font-family:'JetBrains Mono';font-size:11px;color:var(--faint);letter-spacing:.05em}
 .live-dot{width:6px;height:6px;border-radius:50%;background:var(--profit);box-shadow:0 0 8px var(--profit);animation:pulse 2s infinite;flex:none}
 
@@ -271,13 +276,15 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;position:relative;z-
   transition:color .2s,border-color .2s,background .2s}
 .dash-tab:hover{color:var(--ink)}
 .dash-tab.on{color:var(--cyan);background:rgba(127,199,155,.1);border-color:rgba(127,199,155,.3)}
+.mini-tabs{margin-bottom:14px}
+.mini-tabs .dash-tab{font-size:11.5px;padding:6px 13px;border-radius:8px}
 
-/* overview layout: charts left, Copilot signals card right */
-.dash-grid-hero{display:grid;grid-template-columns:1fr 300px;gap:18px;align-items:start}
-.dash-grid-hero .dash-grid-2{grid-template-columns:1fr 1fr}
-@media (max-width:1200px){.dash-grid-hero{grid-template-columns:1fr}}
-.signals-card .eq-head{padding-bottom:4px}
+/* Watchpoints: a full-width strip under the overview charts, findings side by side */
 .signals-body{padding:10px 22px 20px;display:flex;flex-direction:column;gap:16px}
+.signals-row{flex-direction:row;gap:0}
+.signals-row .signal{flex:1;border-bottom:none;border-right:1px solid var(--line-2);padding:2px 20px 2px 0;margin-right:20px}
+.signals-row .signal:last-of-type{border-right:none;margin-right:0}
+.signals-row .signals-evidence{flex:none;align-self:center;margin-left:6px}
 .signal{border-bottom:1px solid var(--line-2);padding-bottom:14px}
 .signal:last-child{border-bottom:none;padding-bottom:0}
 .signal-text{font-size:13px;line-height:1.55;color:var(--ink);margin-bottom:9px}
@@ -501,7 +508,11 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;position:relative;z-
 .copilot-bar-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#7FC79B,#3E6B4F)}
 .copilot-bar-val{font-family:'JetBrains Mono';font-size:11px;text-align:right}
 
-.copilot-table-wrap{overflow-x:auto;max-height:320px;overflow-y:auto}
+.copilot-table-wrap{overflow-x:auto;max-height:320px;overflow-y:auto;
+  border:1px solid var(--line-2);border-radius:10px;padding:0 12px;margin-top:12px;background:var(--void)}
+/* header stays pinned while the body scrolls -- rows no longer slide under nothing */
+.copilot-table thead th{position:sticky;top:0;background:var(--void);z-index:2;padding-top:10px;padding-bottom:8px}
+.copilot-table-more{position:sticky;bottom:0;background:var(--void);padding:8px 0}
 
 /* Verify: per-turn receipt button + modal listing every tool call with its args */
 .copilot-verify-btn{font-family:'JetBrains Mono';font-size:10px;color:var(--faint);
