@@ -296,13 +296,19 @@ function openVerifyModal(tools) {
       : Object.keys(t.args).length
         ? `<pre class="verify-args">${escapeHtml(JSON.stringify(t.args, null, 2))}</pre>`
         : `<div class="verify-noargs">no parameters</div>`;
+    // every call explains HOW it computes its answer -- this is the tool's own
+    // schema description, the same text the model read when choosing it. For SQL
+    // the query above is the real "how", so the generic line stays secondary.
+    const how = t.description
+      ? `<div class="verify-how"><span>HOW THIS WORKS</span>${escapeHtml(t.description)}</div>`
+      : "";
     return `<div class="verify-call">
       <div class="verify-call-head">
         <span class="verify-n mono">${String(i + 1).padStart(2, "0")}</span>
         <span class="verify-label">${t.label}</span>
         <span class="verify-tool mono">${t.tool}</span>
       </div>
-      ${detail}
+      ${isSql ? detail + how : detail + how}
     </div>`;
   }).join("");
   verifyModal.classList.add("open");
@@ -480,7 +486,7 @@ async function sendMessage(forcedText) {
           sawAnyOutput = true;
           thinkingText.textContent = data.label;
           liveChips.push(addToolChip(data.label));
-          turnTools.push({ label: data.label, tool: data.tool, args: data.args || {} });
+          turnTools.push({ label: data.label, tool: data.tool, args: data.args || {}, description: data.description || "" });
           if (fullText && !fullText.endsWith("\n\n")) fullText += "\n\n";
         } else if (event === "tool_result") {
           pendingEvidence.push({ tool: data.tool, result: data.result });

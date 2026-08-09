@@ -272,6 +272,9 @@ TOOLS = [
 
 # Plain-English label shown in the frontend's "thinking" line while a tool call is in
 # flight -- real, driven by the actual tool name + args the model chose, not faked.
+# tool name -> its schema description, for the Verify modal's HOW THIS WORKS line
+TOOL_DESCRIPTIONS = {t["name"]: t["description"] for t in TOOLS}
+
 _LABELS = {
     "list_properties": lambda a: "Listing properties",
     "get_property": lambda a: f"Looking up property {a.get('property_id', '')}",
@@ -486,7 +489,15 @@ def stream_chat(history, tool_dispatch):
                 continue
             # args included so the frontend's Verify modal can show exactly what was
             # requested, not just a friendly label
-            yield _sse("tool_call", {"tool": block.name, "label": describe_tool_call(block.name, block.input), "args": block.input})
+            # label for the live chip, args + the tool's own schema description for
+            # the Verify modal -- so "how this works" is the same text the model
+            # itself read when choosing the tool, not a separate copy to drift
+            yield _sse("tool_call", {
+                "tool": block.name,
+                "label": describe_tool_call(block.name, block.input),
+                "args": block.input,
+                "description": TOOL_DESCRIPTIONS.get(block.name, ""),
+            })
 
             conn = _open_conn()
             is_error = False
