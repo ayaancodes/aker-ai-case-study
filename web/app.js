@@ -28,7 +28,7 @@ function particleField(cv) {
       const pz = z / (ROWS - 1);
       const y0 = horizon + (base - horizon) * Math.pow(pz, 1.7);
       const spread = W * (0.5 + 1.0 * pz);
-      const size = 0.6 + 2.1 * pz;
+      const size = 0.9 + 2.5 * pz;
       const amp = 4 + 22 * pz;
       for (let x = 0; x < COLS; x++) {
         const px = x / (COLS - 1);
@@ -38,7 +38,7 @@ function particleField(cv) {
         const r = Math.round(127 + (62 - 127) * px);
         const g = Math.round(199 + (107 - 199) * px);
         const b = Math.round(155 + (79 - 155) * px);
-        ctx.fillStyle = `rgba(${r},${g},${b},${0.1 + 0.35 * pz})`;
+        ctx.fillStyle = `rgba(${r},${g},${b},${0.22 + 0.5 * pz})`;
         ctx.beginPath();
         ctx.arc(X, Y, size, 0, Math.PI * 2);
         ctx.fill();

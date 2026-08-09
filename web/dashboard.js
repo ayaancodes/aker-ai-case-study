@@ -164,6 +164,7 @@ async function showPropertyView(propertyId) {
 
   renderPropertyKpis(rev, occ, delinquent.rows, leases.leases);
   renderUnitsTable(units.units);
+  PROPERTY_OCC = occ; // property averages feed the unit modal's comparison stats
 
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -188,39 +189,26 @@ function kpiTile(value, label, vizId, legend, pop, icon) {
   return `<div class="kpi-tile ${pop ? "has-pop" : ""}">${ic}<div class="kv">${value}</div><div class="kk">${label}</div>${viz}${leg}${popEl}</div>`;
 }
 
-/* soft area mini-viz in Aker's card style: thin line + gradient fill + end dot.
-   Drawn from the SORTED per-property distribution, not a time series -- the legend
-   under each tile says so, and there is deliberately no MoM/delta anywhere. */
-function drawKpiArea(id, values) {
+/* mini vertical-bar distribution: one bar per value, sorted. Bars read as a
+   distribution across properties; the earlier area/line version read as a declining
+   time series, which is exactly the false impression a one-snapshot dataset must
+   never give. No MoM/delta anywhere, still. */
+function drawKpiBars(id, values) {
   const cv = document.getElementById(id);
   if (!cv || !values.length) return;
   const { ctx, w, h } = fitCanvas(cv);
   ctx.clearRect(0, 0, w, h);
   const max = Math.max(...values, 1);
-  const pts = values.map((v, i) => [
-    values.length === 1 ? w : (i / (values.length - 1)) * (w - 4),
-    h - 3 - (Math.max(v, 0) / max) * (h - 8),
-  ]);
-  const fill = ctx.createLinearGradient(0, 0, 0, h);
-  fill.addColorStop(0, "rgba(127,199,155,.28)");
-  fill.addColorStop(1, "rgba(127,199,155,.02)");
-  ctx.beginPath();
-  ctx.moveTo(pts[0][0], h);
-  pts.forEach(([x, y]) => ctx.lineTo(x, y));
-  ctx.lineTo(pts[pts.length - 1][0], h);
-  ctx.closePath();
-  ctx.fillStyle = fill;
-  ctx.fill();
-  ctx.beginPath();
-  pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
-  ctx.strokeStyle = "#7FC79B";
-  ctx.lineWidth = 1.6;
-  ctx.stroke();
-  const [lx, ly] = pts[pts.length - 1];
-  ctx.beginPath();
-  ctx.arc(lx, ly, 2.6, 0, Math.PI * 2);
-  ctx.fillStyle = "#7FC79B";
-  ctx.fill();
+  const gap = 3;
+  const barW = Math.max(3, (w - gap * (values.length - 1)) / values.length);
+  values.forEach((v, i) => {
+    const bh = Math.max(2, (Math.max(v, 0) / max) * (h - 4));
+    const x = i * (barW + gap);
+    ctx.fillStyle = i === 0 ? "#7FC79B" : "rgba(127,199,155,.38)";
+    ctx.beginPath();
+    ctx.roundRect(x, h - bh, barW, bh, 2);
+    ctx.fill();
+  });
 }
 
 function popRows(pairs) {
@@ -310,13 +298,13 @@ function renderPortfolioKpis(revenue, occupancy, delinquent, leases, leaseRefDat
     kpiTile(leases.length, "Leases rolling over (60d)",
       "kpiRollViz", `${within30} WITHIN 30D · ${leases.length - within30} IN 31-60D`, rolloverPop, "cal");
 
-  drawKpiArea("kpiNetViz", [...revenue.by_property].map((p) => p.net_effective_revenue).sort((a, b) => b - a));
+  drawKpiBars("kpiNetViz", [...revenue.by_property].map((p) => p.net_effective_revenue).sort((a, b) => b - a));
   drawKpiSegments("kpiGrossViz", [
     { value: revenue.total_gross_revenue, color: "#7FC79B" },
     { value: Math.abs(revenue.total_concessions), color: "#E2836F" },
   ]);
   if (occupancy.pct_occ != null) drawKpiProgress("kpiOccViz", occupancy.pct_occ);
-  drawKpiArea("kpiDelViz", delinquent.map((r) => r.balance).sort((a, b) => b - a).slice(0, 40));
+  drawKpiBars("kpiDelViz", delinquent.map((r) => r.balance).sort((a, b) => b - a).slice(0, 24));
   drawKpiSegments("kpiRollViz", [
     { value: within30 || 0.0001, color: "#C9A96A" },
     { value: (leases.length - within30) || 0.0001, color: "rgba(201,169,106,.35)" },
@@ -403,6 +391,7 @@ function renderConcentration(rows) {
 /* ── units table with lookup + filters. All filtering is client-side over the units
    already fetched for the selected property -- no refetch per keystroke. ── */
 let PROPERTY_UNITS = [];
+let PROPERTY_OCC = null;
 
 function renderUnitsTable(units) {
   PROPERTY_UNITS = units;
@@ -470,31 +459,77 @@ document.getElementById("unitModalBackdrop").addEventListener("click", closeUnit
 document.getElementById("unitModalClose").addEventListener("click", closeUnitModal);
 addEventListener("keydown", (e) => { if (e.key === "Escape") closeUnitModal(); });
 
+/* footprint graphic: this unit's floor area drawn to scale inside the property's
+   average unit (dashed outline). Sides scale by sqrt(area) so AREA is what's
+   proportional -- a 2x sq ft unit looks 2x the area, not 4x. */
+function unitSizeVizHtml(sqFt, avgSqFt) {
+  if (!sqFt) return "";
+  const OUTER = 128;
+  const ratio = avgSqFt ? Math.sqrt(sqFt / avgSqFt) : 1;
+  const inner = Math.max(34, Math.min(OUTER * ratio, 176));
+  const box = Math.max(OUTER, inner) + 14;
+  const avgLabel = avgSqFt
+    ? `<div class="usv-caption">AVG UNIT HERE &middot; ${Math.round(avgSqFt)} SQ FT</div>`
+    : "";
+  return `
+    <div class="unit-size-viz" style="width:${box}px;height:${box}px">
+      ${avgSqFt ? `<div class="usv-avg" style="width:${OUTER}px;height:${OUTER}px"></div>` : ""}
+      <div class="usv-unit" style="width:${inner}px;height:${inner}px">
+        <span class="mono">${Math.round(sqFt)}</span><small>SQ FT</small>
+      </div>
+    </div>${avgLabel}`;
+}
+
+/* lease timeline: move-in to expiration with a marker at the data's as-of date --
+   an expired-but-occupied lease (holdover) shows exactly as what it is */
+function leaseTimelineHtml(t, asOf) {
+  if (!t?.move_in || !t?.lease_expiration || !asOf) return "";
+  const start = new Date(t.move_in), end = new Date(t.lease_expiration), now = new Date(asOf);
+  const span = end - start;
+  if (span <= 0) return `<div class="unit-gap-note">Impossible dates in the source file: move-in ${t.move_in} is after expiration ${t.lease_expiration}.</div>`;
+  const pct = Math.max(0, Math.min(100, ((now - start) / span) * 100));
+  const daysLeft = Math.round((end - now) / 86400000);
+  const state = daysLeft < 0
+    ? `<span class="lt-state warn">EXPIRED ${Math.abs(daysLeft)}D AGO &middot; HOLDOVER</span>`
+    : `<span class="lt-state">${daysLeft} DAYS LEFT</span>`;
+  return `
+    <div class="lease-timeline">
+      <div class="lt-head"><span>LEASE TERM</span>${state}</div>
+      <div class="lt-track"><div class="lt-fill${daysLeft < 0 ? " over" : ""}" style="width:${pct}%"></div></div>
+      <div class="lt-dates mono"><span>${t.move_in}</span><span>${t.lease_expiration}</span></div>
+    </div>`;
+}
+
 document.getElementById("unitsBody").addEventListener("click", async (e) => {
   const row = e.target.closest("tr[data-unit-id]");
   if (!row) return;
   const detail = await api(`/units/${row.dataset.unitId}`);
   const t = detail.tenancy;
+  const avgRent = PROPERTY_OCC?.avg_rent;
+  const avgSqFt = PROPERTY_OCC?.avg_sq_ft;
 
-  const facts = popRows([
-    ["Status", t ? t.status : "no current tenancy"],
-    ["Resident", t?.resident_name || "—"],
-    ["Program", detail.program_type],
-    ["Sq ft", detail.sq_ft ? Math.round(detail.sq_ft) : "—"],
-    ["Market rent", t?.market_rent ? fmtMoney(t.market_rent) : "—"],
-    ["Deposit", t?.resident_deposit ? fmtMoney(t.resident_deposit) : "—"],
-    ["Move in", t?.move_in || "—"],
-    ["Lease expires", t?.lease_expiration || "—"],
-    ["Move out", t?.move_out || "—"],
-    ["Balance", t?.balance ? fmtMoney(t.balance) : "$0", t?.balance > 0 ? "down" : ""],
-  ]);
+  // comparison stats around the footprint graphic, all computed from fields on
+  // screen: rent vs the property average, and rent per square foot
+  const stats = [];
+  if (t?.market_rent) {
+    stats.push(["Market rent", fmtMoney(t.market_rent)]);
+    if (avgRent) {
+      const diff = Math.round(100 * (t.market_rent - avgRent) / avgRent);
+      stats.push(["vs property avg", `${diff >= 0 ? "+" : ""}${diff}%`, diff >= 0 ? "up" : "down"]);
+    }
+    if (detail.sq_ft) stats.push(["Rent / sq ft", "$" + (t.market_rent / detail.sq_ft).toFixed(2)]);
+  }
+  stats.push(["Status", t ? t.status : "no current tenancy"]);
+  if (t?.resident_name) stats.push(["Resident", t.resident_name]);
+  if (t?.resident_deposit) stats.push(["Deposit", fmtMoney(t.resident_deposit)]);
+  if (t?.balance) stats.push(["Balance", fmtMoney(t.balance), t.balance > 0 ? "down" : ""]);
 
   let chargesHtml;
   if (detail.charges.length) {
     chargesHtml = popRows(detail.charges.map((c) =>
       [`${c.charge_code} · ${c.category.replace("_", " ")}`, fmtMoneySigned(c.amount), c.amount < 0 ? "down" : ""]
     )) + popRows([["Total", fmtMoney(detail.total_charges), "up"]]);
-  } else if (t && (t.status === "occupied" || t.status === "notice") ) {
+  } else if (t && (t.status === "occupied" || t.status === "notice")) {
     chargesHtml = `<div class="unit-gap-note">No charge lines recorded for this tenancy in the
       source file despite an active resident -- this is the missing_charges data quality gap
       (see Anomalies on the How it's built page). Revenue for this unit is understated.</div>`;
@@ -505,10 +540,13 @@ document.getElementById("unitsBody").addEventListener("click", async (e) => {
   document.getElementById("unitModalBody").innerHTML = `
     <div class="gate-eyebrow">${detail.canonical_name} &middot; ${detail.property_id}</div>
     <h2>Unit ${detail.unit_number}</h2>
-    <p class="mono" style="font-size:11px">${detail.unit_type || ""}</p>
-    <div class="unit-modal-grid">
-      <div><div class="unit-modal-heading">TENANCY</div>${facts}</div>
-      <div><div class="unit-modal-heading">CHARGE LINES · THIS PERIOD</div>${chargesHtml}</div>
+    <p class="mono" style="font-size:11px">${detail.unit_type || ""} &middot; ${detail.program_type}</p>
+    <div class="unit-modal-top">
+      <div class="unit-modal-viz">${unitSizeVizHtml(detail.sq_ft, avgSqFt)}</div>
+      <div class="unit-modal-stats">${popRows(stats)}${leaseTimelineHtml(t, PORTFOLIO?.leaseRef)}</div>
+    </div>
+    <div class="unit-modal-charges">
+      <div class="unit-modal-heading">CHARGE LINES · THIS PERIOD</div>${chargesHtml}
     </div>`;
   unitModal.classList.add("open");
   unitModal.setAttribute("aria-hidden", "false");

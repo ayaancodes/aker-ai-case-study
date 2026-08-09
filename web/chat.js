@@ -25,11 +25,27 @@ api("/leases/expiring?days=0").then((d) => {
   asOfNote.textContent = `AS OF ${d.reference_date}`;
 }).catch(() => {});
 
+/* Scroll model used by every real chat app: a "following" flag, not a per-tick
+   proximity guess. Sending a message starts following; the user scrolling UP stops
+   it; scrolling back to the bottom resumes it. The proximity heuristic failed on the
+   second turn because a tall card render could leave the viewport outside the 80px
+   window before the next tick measured it. */
+let FOLLOWING = true;
+
+copilotMessages.addEventListener("scroll", () => {
+  const dist = copilotMessages.scrollHeight - copilotMessages.scrollTop - copilotMessages.clientHeight;
+  if (dist < 40) FOLLOWING = true;
+  else if (copilotMessages.dataset.autoScrolling !== "1") FOLLOWING = false;
+});
+
 function scrollToBottom(force) {
-  // only auto-stick when the user is already near the bottom -- if they scrolled up
-  // to read something, generation must not yank them back down
-  const nearBottom = copilotMessages.scrollHeight - copilotMessages.scrollTop - copilotMessages.clientHeight < 80;
-  if (force || nearBottom) copilotMessages.scrollTop = copilotMessages.scrollHeight;
+  if (!force && !FOLLOWING) return;
+  if (force) FOLLOWING = true;
+  // mark programmatic scrolls so the scroll listener doesn't read them as the user
+  // scrolling away (smooth or instant, a programmatic jump fires scroll events too)
+  copilotMessages.dataset.autoScrolling = "1";
+  copilotMessages.scrollTop = copilotMessages.scrollHeight;
+  requestAnimationFrame(() => { copilotMessages.dataset.autoScrolling = "0"; });
 }
 
 /* escape first, THEN allow only **bold** through -- model text is untrusted input */
@@ -259,6 +275,40 @@ function insertAnimatedCard(afterEl, html, groundingClean) {
   return card;
 }
 
+/* ── Verify modal: the receipt for a turn. Lists every tool call the model made,
+   with the exact arguments sent -- SQL shown as the query itself. Pure display of
+   what already happened server-side; nothing here is reconstructed or guessed. ── */
+const verifyModal = document.getElementById("verifyModal");
+
+function closeVerifyModal() {
+  verifyModal.classList.remove("open");
+  verifyModal.setAttribute("aria-hidden", "true");
+}
+document.getElementById("verifyBackdrop").addEventListener("click", closeVerifyModal);
+document.getElementById("verifyClose").addEventListener("click", closeVerifyModal);
+addEventListener("keydown", (e) => { if (e.key === "Escape") closeVerifyModal(); });
+
+function openVerifyModal(tools) {
+  document.getElementById("verifyBody").innerHTML = tools.map((t, i) => {
+    const isSql = t.tool === "query_database" && t.args.sql;
+    const detail = isSql
+      ? `<pre class="verify-sql">${escapeHtml(t.args.sql)}</pre>`
+      : Object.keys(t.args).length
+        ? `<pre class="verify-args">${escapeHtml(JSON.stringify(t.args, null, 2))}</pre>`
+        : `<div class="verify-noargs">no parameters</div>`;
+    return `<div class="verify-call">
+      <div class="verify-call-head">
+        <span class="verify-n mono">${String(i + 1).padStart(2, "0")}</span>
+        <span class="verify-label">${t.label}</span>
+        <span class="verify-tool mono">${t.tool}</span>
+      </div>
+      ${detail}
+    </div>`;
+  }).join("");
+  verifyModal.classList.add("open");
+  verifyModal.setAttribute("aria-hidden", "false");
+}
+
 async function sendMessage(forcedText) {
   const text = (forcedText ?? copilotInput.value).trim();
   if (!text || sending) return;
@@ -284,6 +334,7 @@ async function sendMessage(forcedText) {
   let finalized = false;
   let sawAnyOutput = false;
   const pendingEvidence = [];
+  const turnTools = []; // every tool call this turn: {label, tool, args} -- feeds Verify
   let groundingUnverified = null;
   let liveChips = [];
 
@@ -328,7 +379,10 @@ async function sendMessage(forcedText) {
           btn.textContent = `+ ${CHIP_LABELS[e.tool] || e.tool.replace(/_/g, " ")}`;
           btn.addEventListener("click", () => {
             btn.disabled = true;
-            insertAnimatedCard(row, buildCardHtml(e.tool, e.result), clean);
+            const card = insertAnimatedCard(row, buildCardHtml(e.tool, e.result), clean);
+            // an expanded card must actually be seen -- bring it into view instead of
+            // leaving it to render below the fold
+            requestAnimationFrame(() => card.scrollIntoView({ behavior: REDUCED ? "auto" : "smooth", block: "nearest" }));
           }, { once: true });
           row.appendChild(btn);
         });
@@ -342,9 +396,23 @@ async function sendMessage(forcedText) {
       warn.className = "copilot-grounding-warn";
       warn.textContent = `Could not verify against tool data: ${groundingUnverified.join(", ")}`;
       lastEl.after(warn);
+      lastEl = warn;
     }
 
+    // Verify: the receipt for this whole turn -- every tool called, with the exact
+    // arguments (and SQL where applicable), in a small modal
+    if (turnTools.length) {
+      const v = document.createElement("button");
+      v.className = "copilot-verify-btn";
+      v.textContent = `Verify · ${turnTools.length} call${turnTools.length > 1 ? "s" : ""}`;
+      v.addEventListener("click", () => openVerifyModal(turnTools));
+      lastEl.after(v);
+    }
+
+    // card entrances change the thread height after the popin settles; keep the
+    // bottom pinned while following (this is what broke second-turn scrolling)
     scrollToBottom();
+    setTimeout(() => scrollToBottom(), 420);
     sending = false;
     copilotSend.disabled = false;
   };
@@ -415,6 +483,7 @@ async function sendMessage(forcedText) {
           sawAnyOutput = true;
           thinkingText.textContent = data.label;
           liveChips.push(addToolChip(data.label));
+          turnTools.push({ label: data.label, tool: data.tool, args: data.args || {} });
           if (fullText && !fullText.endsWith("\n\n")) fullText += "\n\n";
         } else if (event === "tool_result") {
           pendingEvidence.push({ tool: data.tool, result: data.result });

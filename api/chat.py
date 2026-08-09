@@ -476,7 +476,9 @@ def stream_chat(history, tool_dispatch):
         for block in final_message.content:
             if block.type != "tool_use":
                 continue
-            yield _sse("tool_call", {"tool": block.name, "label": describe_tool_call(block.name, block.input)})
+            # args included so the frontend's Verify modal can show exactly what was
+            # requested, not just a friendly label
+            yield _sse("tool_call", {"tool": block.name, "label": describe_tool_call(block.name, block.input), "args": block.input})
 
             conn = _open_conn()
             is_error = False

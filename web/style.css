@@ -199,7 +199,12 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;position:relative;z-
 .stagger.in>*{opacity:1;transform:none}
 
 /* ───────── SIDE RAIL — numbered section nav, tracks scroll position ───────── */
-.rail{position:fixed;left:28px;top:50%;transform:translateY(-50%);z-index:40;display:flex;flex-direction:column;gap:2px}
+/* the side rail is a <nav>, so it must undo the top-bar nav rule's full-width
+   stretch (left:0;right:0) and dark blurred background -- without these resets it
+   renders as a page-wide overlay band through the middle of the content */
+.rail{position:fixed;left:28px;right:auto;top:50%;transform:translateY(-50%);z-index:40;
+  display:flex;flex-direction:column;gap:2px;width:max-content;
+  background:none;backdrop-filter:none;border-bottom:none}
 .rail a{display:flex;align-items:center;gap:10px;padding:7px 0;text-decoration:none;color:var(--faint);font-family:'JetBrains Mono';font-size:10.5px;letter-spacing:.06em;border-left:2px solid var(--line-2);padding-left:14px;transition:color .2s,border-color .2s}
 .rail a:hover{color:var(--dim)}
 .rail a.on{color:var(--cyan);border-color:var(--cyan)}
@@ -312,8 +317,31 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;position:relative;z-
 
 /* unit detail modal */
 .modal-card-wide{max-width:640px}
-.unit-modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:18px}
 .unit-modal-heading{font-family:'JetBrains Mono';font-size:9.5px;letter-spacing:.12em;color:var(--faint);margin-bottom:8px}
+.unit-modal-top{display:grid;grid-template-columns:auto 1fr;gap:26px;align-items:start;margin-top:20px}
+.unit-modal-viz{display:flex;flex-direction:column;align-items:center;gap:8px}
+.unit-modal-charges{margin-top:20px;padding-top:16px;border-top:1px solid var(--line-2)}
+@media (max-width:560px){.unit-modal-top{grid-template-columns:1fr}}
+
+/* footprint graphic: unit floor area to scale inside the property-average outline */
+.unit-size-viz{position:relative;display:grid;place-items:center}
+.usv-avg{position:absolute;border:1.5px dashed rgba(154,164,157,.4);border-radius:12px}
+.usv-unit{position:relative;border-radius:10px;background:rgba(127,199,155,.14);border:1px solid rgba(127,199,155,.45);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.usv-unit span{font-size:15px;font-weight:700;color:var(--cyan)}
+.usv-unit small{font-family:'JetBrains Mono';font-size:8px;letter-spacing:.1em;color:var(--dim)}
+.usv-caption{font-family:'JetBrains Mono';font-size:8.5px;letter-spacing:.08em;color:var(--faint)}
+
+/* lease timeline: move-in -> expiration, marker fill up to the as-of date */
+.lease-timeline{margin-top:14px}
+.lt-head{display:flex;justify-content:space-between;font-family:'JetBrains Mono';font-size:9px;
+  letter-spacing:.1em;color:var(--faint);margin-bottom:7px}
+.lt-state{color:var(--cyan)}
+.lt-state.warn{color:var(--warn)}
+.lt-track{height:7px;border-radius:99px;background:rgba(154,164,157,.14);overflow:hidden}
+.lt-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#7FC79B,#3E6B4F)}
+.lt-fill.over{background:linear-gradient(90deg,#C9A96A,#8a6f3e)}
+.lt-dates{display:flex;justify-content:space-between;font-size:9.5px;color:var(--faint);margin-top:6px}
 .unit-gap-note{font-size:12px;line-height:1.55;color:var(--loss);border:1px solid rgba(248,113,113,.3);background:rgba(248,113,113,.07);border-radius:10px;padding:10px 12px}
 .units-table tbody tr{cursor:pointer;transition:background .12s}
 .units-table tbody tr:hover{background:rgba(127,199,155,.05)}
@@ -474,6 +502,21 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;position:relative;z-
 .copilot-bar-val{font-family:'JetBrains Mono';font-size:11px;text-align:right}
 
 .copilot-table-wrap{overflow-x:auto;max-height:320px;overflow-y:auto}
+
+/* Verify: per-turn receipt button + modal listing every tool call with its args */
+.copilot-verify-btn{font-family:'JetBrains Mono';font-size:10px;color:var(--faint);
+  background:transparent;border:1px solid var(--line);border-radius:99px;padding:4px 12px;
+  margin-left:35px;cursor:pointer;display:inline-flex;width:fit-content;transition:color .15s,border-color .15s}
+.copilot-verify-btn:hover{color:var(--cyan);border-color:rgba(127,199,155,.35)}
+#verifyBody{max-height:50vh;overflow-y:auto;display:flex;flex-direction:column;gap:14px}
+.verify-call{border:1px solid var(--line-2);border-radius:12px;padding:12px 14px;background:var(--void)}
+.verify-call-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.verify-n{font-size:10px;color:var(--faint)}
+.verify-label{font-size:13px;font-weight:600}
+.verify-tool{font-size:10px;color:var(--cyan);margin-left:auto}
+.verify-sql,.verify-args{font-family:'JetBrains Mono';font-size:10.5px;color:var(--dim);white-space:pre-wrap;
+  border-top:1px solid var(--line-2);margin-top:9px;padding-top:9px}
+.verify-noargs{font-family:'JetBrains Mono';font-size:10px;color:var(--faint);margin-top:8px}
 
 /* the SQL receipt under a query card: exactly how a number was computed */
 .copilot-sql{margin-top:10px}

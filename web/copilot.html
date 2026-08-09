@@ -13,6 +13,19 @@
 
 <div class="cursor-glow" id="cursorGlow"></div>
 
+<!-- ───────── VERIFY MODAL — the receipt for a turn: every tool call the model made,
+     with the exact arguments sent (SQL shown as the query itself). ───────── -->
+<div class="modal" id="verifyModal" aria-hidden="true">
+  <div class="modal-backdrop" id="verifyBackdrop"></div>
+  <div class="modal-card modal-card-wide">
+    <button class="modal-close" id="verifyClose" aria-label="Close">&times;</button>
+    <div class="gate-eyebrow">VERIFICATION</div>
+    <h2>How this was computed</h2>
+    <p>Every call the copilot made for this answer, exactly as sent.</p>
+    <div id="verifyBody"></div>
+  </div>
+</div>
+
 <nav id="nav">
   <div class="nav-in">
     <a class="logo" href="index.html">
