@@ -2,8 +2,7 @@
    and the sign-in modal. All analytics live in dashboard.html -- the landing stays
    deliberately small. */
 
-/* ── perspective particle field, adapted from Vega's hero background (2D canvas
-   version, permission granted to reuse/adapt) -- purely atmospheric motion, the
+/* ── perspective particle field, 2D canvas -- purely atmospheric motion, the
    only visual in the hero besides the headline itself. ── */
 function particleField(cv) {
   if (REDUCED || !cv) return;

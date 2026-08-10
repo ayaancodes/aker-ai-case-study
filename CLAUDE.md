@@ -307,18 +307,15 @@ Place alias, `altapm` correctly 404s on `/revenue` since it has no charge data).
 - **Data quality as a feature**: the `/anomalies` endpoint becomes a live feature the
   chatbot can report on, second priority after the portfolio-aware chatbot + dashboard
   itself.
-- **Visual direction**: dark fintech aesthetic borrowed from a friend's project
-  (vegalabs.vercel.app, full permission granted to reuse/adapt the code) — glass/blur
-  cards, JetBrains Mono for all numbers, Bricolage Grotesque for headings, cyan accent,
-  count-up stat tiles, a scrolling ticker strip (properties instead of stock tickers),
-  and a marquee of property cards. Not cloning the marketing page wholesale, pulling the
-  design system and component patterns onto real data from the API. Deliberate choice to
-  lean into "theatrics" here, not just function — a live tool-calling demo and visible
-  data-quality catches are meant to be a genuine wow moment in the demo, not just correct.
+- **Visual direction**: dark fintech aesthetic — glass/blur cards, JetBrains Mono for
+  all numbers, Bricolage Grotesque for headings, cyan accent, count-up stat tiles, a
+  scrolling ticker strip (properties instead of stock tickers), and a marquee of
+  property cards. Deliberate choice to lean into "theatrics" here, not just function —
+  a live tool-calling demo and visible data-quality catches are meant to be a genuine
+  wow moment in the demo, not just correct.
 - **Stretch goal, not committed**: a 3D phone mockup showing the dashboard/chatbot on
-  mobile, same visual trick as Vega's phone showcase. Cool but a lot of animation work
-  for the time available — parked here so it's not lost, revisit only if everything else
-  is done early.
+  mobile. Cool but a lot of animation work for the time available — parked here so
+  it's not lost, revisit only if everything else is done early.
 - **Deployment**: keep it to one deployable service if possible (FastAPI serving API +
   frontend) given the Monday deadline. Render or Railway for hosting.
 

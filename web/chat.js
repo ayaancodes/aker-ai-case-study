@@ -1,9 +1,8 @@
-/* AM Copilot page. Streams from POST /chat via hand-rolled SSE parsing (EventSource
-   can't send a POST body). Presentation follows the v2 brief: throttled typewriter
-   text with click-to-skip, evidence deferred until the prose finishes, one card max
-   per response with further datasets collapsed into expandable chips, and Vega
-   methodology motion (popin, staggered rows, bar draw-in, pass-pulse, sheen).
-   History is session-only, in memory. */
+/* Copilot page. Streams from POST /chat via hand-rolled SSE parsing (EventSource
+   can't send a POST body). Throttled typewriter text with click-to-skip, evidence
+   deferred until the prose finishes, one card max per response with further datasets
+   collapsed into expandable chips, motion on popin/staggered rows/bar draw-in/
+   pass-pulse/sheen. History is session-only, in memory. */
 
 const copilotMessages = document.getElementById("copilotMessages");
 const copilotInput = document.getElementById("copilotInput");

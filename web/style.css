@@ -604,8 +604,8 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;position:relative;z-
 .copilot-msg.user{flex-direction:row-reverse}
 .copilot-avatar{width:26px;height:26px;border-radius:8px;background:var(--grad);flex:none;
   display:grid;place-items:center;font-family:'Bricolage Grotesque';font-weight:800;font-size:12px;color:#06130B}
-/* prose back on the Vega/product type stack -- the serif experiment lost to matching
-   the motion reference's typography, per the v2 brief */
+/* prose back on the product type stack -- a serif experiment was tried and dropped
+   in favor of matching the rest of the app's typography */
 .copilot-bubble-text{max-width:560px;font-size:14px;line-height:1.6;
   padding:11px 15px;border-radius:13px;border:1px solid var(--line);background:var(--glass);
   white-space:pre-wrap;word-wrap:break-word;cursor:default}
@@ -627,7 +627,7 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;position:relative;z-
 @keyframes copilot-breathe{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.12);opacity:.75}}
 @keyframes copilot-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 
-/* live tool-call chip, with Vega's marching-dash connector while the tool runs --
+/* live tool-call chip, with a marching-dash connector while the tool runs --
    reads as "data flowing", goes static once the result lands */
 .copilot-tool-chip{font-family:'JetBrains Mono';font-size:10px;color:var(--cyan);
   background:rgba(127,199,155,.08);border:1px solid rgba(127,199,155,.25);border-radius:99px;
@@ -654,7 +654,7 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;position:relative;z-
   background:rgba(201,169,106,.07);border:1px solid rgba(201,169,106,.3);border-radius:8px;
   padding:5px 10px;margin-left:36px;max-width:calc(100% - 36px)}
 
-/* ── Vega methodology motion, adapted: cards pop in after the prose finishes, table
+/* ── copilot response motion: cards pop in after the prose finishes, table
    rows stagger one-by-one, bars draw to width, a single sheen sweeps a finished
    card, and KPI numbers pulse green once when the grounding check passes clean.
    Everything gated off for prefers-reduced-motion at the bottom of this section. ── */
