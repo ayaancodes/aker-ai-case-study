@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AKER AI &middot; Dashboard</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -67,6 +68,16 @@
         <div class="dash-head-chips" id="dashFactChips"></div>
       </div>
       <div class="dash-head-status" id="dashStatusChips"></div>
+    </div>
+
+    <!-- property identity sits above the KPI strip: those KPIs belong to this
+         property, so naming it first is the correct reading order -->
+    <div class="dash-prop-bar" id="dashPropBar" style="display:none">
+      <button class="dash-back" id="dashBack">&larr; ALL PROPERTIES</button>
+      <div class="dash-prop-head">
+        <h2 id="pName"></h2>
+        <span id="pId"></span>
+      </div>
     </div>
 
     <div class="dash-kpi-strip" id="dashKpiStrip"></div>
@@ -159,12 +170,6 @@
 
     <!-- ───────── PROPERTY VIEW (replaces portfolio view entirely on selection) ───────── -->
     <div id="dashPropertyView" style="display:none">
-      <button class="dash-back" id="dashBack">&larr; ALL PROPERTIES</button>
-      <div class="dash-prop-head">
-        <h2 id="pName"></h2>
-        <span id="pId"></span>
-      </div>
-
       <!-- Two views of the same units: a pannable grid first (one cell per real
            unit, colored by real status, click for the detail modal), the table
            second. Revenue/delinquents/rollover live in the KPI hover popovers. -->

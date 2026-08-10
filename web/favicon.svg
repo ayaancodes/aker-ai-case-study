@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Same lambda glyph as the AKER wordmark, on the brand green so it stays
+       legible against both light and dark browser tab bars. -->
+  <rect width="32" height="32" rx="7" fill="#7FC79B"/>
+  <g stroke="#0B0D0C" stroke-width="2.8" stroke-linecap="round" fill="none">
+    <path d="M11.4 6.5 L23 27"/>
+    <path d="M16.7 15.9 L9.2 27"/>
+  </g>
+</svg>

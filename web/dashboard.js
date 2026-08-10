@@ -307,6 +307,7 @@ function showPortfolioView() {
   document.querySelectorAll(".status-chip").forEach((c) => c.classList.remove("on"));
   document.getElementById("dashPortfolioView").style.display = "";
   document.getElementById("dashPropertyView").style.display = "none";
+  document.getElementById("dashPropBar").style.display = "none";
   renderSidebar(sortedPortfolio(), document.getElementById("dashSearch").value);
   renderPortfolioKpis(PORTFOLIO.revenue, PORTFOLIO.occupancy, PORTFOLIO.delinquent, PORTFOLIO.leases, PORTFOLIO.leaseRef);
 }
@@ -316,6 +317,7 @@ async function showPropertyView(propertyId) {
   SIDEBAR_BROWSING = false;
   document.getElementById("dashPortfolioView").style.display = "none";
   document.getElementById("dashPropertyView").style.display = "";
+  document.getElementById("dashPropBar").style.display = "";
 
   renderSidebar(sortedPortfolio(), document.getElementById("dashSearch").value);
 
