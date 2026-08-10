@@ -825,3 +825,16 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;position:relative;z-
 
 /* the wordmark at the true top-left, heading the sidebar */
 .side-logo{padding:2px 10px 20px;margin-bottom:4px}
+
+/* ── grid ripple: cells fade/pop in from the top-left corner outward, per-cell
+   delay set inline from grid distance. Reads as the building filling up. ── */
+@keyframes ug-in{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}
+.ug-cell.ug-in{animation:ug-in .34s cubic-bezier(.2,.8,.2,1) both}
+
+/* ── view transition: portfolio and property views arrive rather than hard-swap ── */
+@keyframes view-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.view-in{animation:view-in .22s cubic-bezier(.2,.8,.2,1) both}
+
+@media (prefers-reduced-motion: reduce){
+  .ug-cell.ug-in,.view-in{animation:none}
+}

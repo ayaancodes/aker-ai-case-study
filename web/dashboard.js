@@ -70,8 +70,50 @@ async function init() {
   // data is rendered: swap the loading state for the real content
   document.getElementById("dashLoading").remove();
   document.getElementById("dashContent").hidden = false;
+  countUpKpis();
 
   observeReveals();
+}
+
+/* ── KPI count-up. Tile values are already formatted strings ("$1,636,736",
+   "91.5%", "326"), so instead of rewiring every call site this parses the rendered
+   text back into a number plus its prefix, suffix and decimal precision, then rolls
+   it up. Values with no number in them (an em dash placeholder) are left alone.
+   Hidden tabs get the final value immediately, since rAF does not run there and a
+   stalled animation would leave a zero on screen. ── */
+function countUpKpis(root = document) {
+  root.querySelectorAll(".kpi-tile .kv").forEach((el) => {
+    const m = el.textContent.match(/^([^\d-]*)(-?[\d,]+(?:\.\d+)?)(.*)$/);
+    if (!m) return;
+    const [, prefix, numStr, suffix] = m;
+    const target = parseFloat(numStr.replace(/,/g, ""));
+    if (!isFinite(target)) return;
+    const decimals = (numStr.split(".")[1] || "").length;
+    const fmt = (v) => prefix + v.toLocaleString(undefined, {
+      minimumFractionDigits: decimals, maximumFractionDigits: decimals,
+    }) + suffix;
+
+    if (REDUCED || document.hidden) { el.textContent = fmt(target); return; }
+    const start = performance.now(), dur = 900;
+    const frame = (t) => {
+      const p = Math.min(1, (t - start) / dur);
+      el.textContent = fmt(target * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(frame);
+      else el.textContent = fmt(target); // land exactly on the real value
+    };
+    requestAnimationFrame(frame);
+  });
+}
+
+/* ── 3. view transition: portfolio and property views fade/slide in rather than
+   hard-swapping. The class is stripped on animationend so no transform lingers to
+   become a containing block for fixed-position children. ── */
+function playViewIn(el) {
+  if (REDUCED || !el) return;
+  el.classList.remove("view-in");
+  void el.offsetWidth; // restart the animation on re-entry
+  el.classList.add("view-in");
+  el.addEventListener("animationend", () => el.classList.remove("view-in"), { once: true });
 }
 
 function renderDelinquentSplit(program) {
@@ -310,6 +352,8 @@ function showPortfolioView() {
   document.getElementById("dashPropBar").style.display = "none";
   renderSidebar(sortedPortfolio(), document.getElementById("dashSearch").value);
   renderPortfolioKpis(PORTFOLIO.revenue, PORTFOLIO.occupancy, PORTFOLIO.delinquent, PORTFOLIO.leases, PORTFOLIO.leaseRef);
+  countUpKpis();
+  playViewIn(document.getElementById("dashPortfolioView"));
 }
 
 async function showPropertyView(propertyId) {
@@ -336,6 +380,9 @@ async function showPropertyView(propertyId) {
   renderUnitsTable(units.units);
   renderUnitGrid(units.units);
   PROPERTY_OCC = occ; // property averages feed the unit modal's comparison stats
+  countUpKpis();
+  playViewIn(document.getElementById("dashPropBar"));
+  playViewIn(document.getElementById("dashPropertyView"));
 
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -808,8 +855,13 @@ function renderUnitGrid(units) {
   inner.innerHTML = units.map((u, i) => {
     const cx = (i % cols) * (GRID_CELL + GRID_GAP) + GRID_GAP;
     const cy = Math.floor(i / cols) * (GRID_CELL + GRID_GAP) + GRID_GAP;
-    return `<div class="ug-cell ${statusClass(u.status)}" data-unit-id="${u.unit_id}"
-      style="left:${cx}px;top:${cy}px" title="${u.unit_number} · ${u.status || "vacant"}">
+    // ripple in from the top-left: delay by grid distance (row + column), capped so
+    // even a 775-unit property finishes inside a second
+    const delay = Math.min(((i % cols) + Math.floor(i / cols)) * 9, 720);
+    const cls = REDUCED ? "" : " ug-in";
+    const style = `left:${cx}px;top:${cy}px` + (REDUCED ? "" : `;animation-delay:${delay}ms`);
+    return `<div class="ug-cell ${statusClass(u.status)}${cls}" style="${style}"
+      data-unit-id="${u.unit_id}" title="${u.unit_number} · ${u.status || "vacant"}">
       <span>${u.unit_number}</span></div>`;
   }).join("");
 
