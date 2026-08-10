@@ -165,24 +165,58 @@
         <span id="pId"></span>
       </div>
 
-      <!-- Units are the whole property view now. Revenue breakdown, delinquents and
-           rollover live in the KPI tiles' hover popovers instead of their own panels. -->
-      <div class="dash-section">
-        <div class="eq-panel">
-          <div class="eq-head units-head">
-            <div><div class="eq-title">Units</div><div class="eq-sub" id="unitsCount"></div></div>
-            <div class="units-tools">
-              <input type="text" id="unitSearch" placeholder="Find unit or resident&hellip;" autocomplete="off">
-              <select id="unitStatusFilter"><option value="">All statuses</option></select>
+      <!-- Two views of the same units: a pannable grid first (one cell per real
+           unit, colored by real status, click for the detail modal), the table
+           second. Revenue/delinquents/rollover live in the KPI hover popovers. -->
+      <div class="dash-tabs mini-tabs" id="propTabs">
+        <button class="dash-tab on" data-ptab="grid">Unit grid</button>
+        <button class="dash-tab" data-ptab="table">Units table</button>
+      </div>
+
+      <div class="prop-pane" data-ppane="grid">
+        <div class="dash-section">
+          <div class="eq-panel">
+            <div class="eq-head">
+              <div><div class="eq-title">Unit grid</div><div class="eq-sub" id="gridCount"></div></div>
+              <div class="grid-legend">
+                <span><i class="lg occupied"></i>Occupied</span>
+                <span><i class="lg notice"></i>Notice</span>
+                <span><i class="lg vacant"></i>Vacant</span>
+                <span><i class="lg other"></i>Model / Down</span>
+              </div>
+            </div>
+            <div class="unit-grid-viewport" id="gridViewport">
+              <div class="unit-grid-inner" id="gridInner"></div>
+              <div class="grid-zoom">
+                <button id="gridZoomIn" aria-label="Zoom in">+</button>
+                <button id="gridZoomOut" aria-label="Zoom out">&minus;</button>
+                <button id="gridZoomReset" aria-label="Reset view">&#10226;</button>
+              </div>
+              <div class="grid-minimap" id="gridMinimap"><div class="mm-view" id="mmView"></div></div>
+              <div class="grid-hint mono">DRAG TO PAN &middot; SCROLL TO ZOOM &middot; CLICK A UNIT</div>
             </div>
           </div>
-          <div class="units-table-wrap">
-            <table class="units-table">
-              <thead>
-                <tr><th>Unit</th><th>Type</th><th>Sq Ft</th><th>Status</th><th>Resident</th><th>Market Rent</th><th>Balance</th><th>Lease Exp.</th></tr>
-              </thead>
-              <tbody id="unitsBody"></tbody>
-            </table>
+        </div>
+      </div>
+
+      <div class="prop-pane" data-ppane="table" style="display:none">
+        <div class="dash-section">
+          <div class="eq-panel">
+            <div class="eq-head units-head">
+              <div><div class="eq-title">Units</div><div class="eq-sub" id="unitsCount"></div></div>
+              <div class="units-tools">
+                <input type="text" id="unitSearch" placeholder="Find unit or resident&hellip;" autocomplete="off">
+                <select id="unitStatusFilter"><option value="">All statuses</option></select>
+              </div>
+            </div>
+            <div class="units-table-wrap">
+              <table class="units-table">
+                <thead>
+                  <tr><th>Unit</th><th>Type</th><th>Sq Ft</th><th>Status</th><th>Resident</th><th>Market Rent</th><th>Balance</th><th>Lease Exp.</th></tr>
+                </thead>
+                <tbody id="unitsBody"></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>

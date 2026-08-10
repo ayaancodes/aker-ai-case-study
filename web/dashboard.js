@@ -1,5 +1,6 @@
 let CURRENT_PROPERTY_ID = null; // null = portfolio view
 let STATUS_FILTER = null; // null | "healthy" | "watch" -- set by the header chips
+let SIDEBAR_BROWSING = false; // true while the user re-opens the full list from a drill-down
 // Portfolio-wide data fetched once at load and reused when returning from a property
 // view -- it's a single-snapshot database, nothing changes between clicks, so
 // re-fetching three endpoints on every back-click was pure waste.
@@ -244,14 +245,33 @@ function renderSidebar(sorted, query = "") {
     <span>All properties</span>
   </div>`;
 
-  const items = matches.map((p) => `
-    <div class="dash-pitem ${CURRENT_PROPERTY_ID === p.property_id ? "on" : ""}" data-id="${p.property_id}">
-      <span>${p.canonical_name}</span>
-      <span class="pi-amt mono">${fmtMoney(p.net_effective_revenue)}</span>
-    </div>
-  `).join("");
+  // drilled into a property (and not searching or explicitly browsing): the list
+  // collapses to just the current property -- the sidebar acknowledges the
+  // navigation instead of repainting an identical 15-row list with one highlight
+  const collapsed = CURRENT_PROPERTY_ID && !SIDEBAR_BROWSING && !q;
+  if (collapsed) {
+    const p = sorted.find((x) => x.property_id === CURRENT_PROPERTY_ID);
+    list.innerHTML = allItem + `
+      <div class="dash-side-viewing">VIEWING</div>
+      <div class="dash-pitem on" data-id="${p?.property_id ?? ""}">
+        <span>${p?.canonical_name ?? CURRENT_PROPERTY_ID}</span>
+        <span class="pi-amt mono">${p ? fmtMoney(p.net_effective_revenue) : ""}</span>
+      </div>
+      <button class="dash-change-prop" id="dashChangeProp">Change property &rarr;</button>`;
+    document.getElementById("dashChangeProp").addEventListener("click", () => {
+      SIDEBAR_BROWSING = true;
+      renderSidebar(sorted, "");
+    });
+  } else {
+    const items = matches.map((p) => `
+      <div class="dash-pitem ${CURRENT_PROPERTY_ID === p.property_id ? "on" : ""}" data-id="${p.property_id}">
+        <span>${p.canonical_name}</span>
+        <span class="pi-amt mono">${fmtMoney(p.net_effective_revenue)}</span>
+      </div>
+    `).join("");
+    list.innerHTML = allItem + items;
+  }
 
-  list.innerHTML = allItem + items;
   list.querySelectorAll(".dash-pitem").forEach((el) => {
     el.addEventListener("click", () => {
       const id = el.dataset.id;
@@ -267,6 +287,7 @@ function sortedPortfolio() {
 
 function showPortfolioView() {
   CURRENT_PROPERTY_ID = null;
+  SIDEBAR_BROWSING = false;
   STATUS_FILTER = null;
   document.querySelectorAll(".status-chip").forEach((c) => c.classList.remove("on"));
   document.getElementById("dashPortfolioView").style.display = "";
@@ -277,6 +298,7 @@ function showPortfolioView() {
 
 async function showPropertyView(propertyId) {
   CURRENT_PROPERTY_ID = propertyId;
+  SIDEBAR_BROWSING = false;
   document.getElementById("dashPortfolioView").style.display = "none";
   document.getElementById("dashPropertyView").style.display = "";
 
@@ -295,6 +317,7 @@ async function showPropertyView(propertyId) {
 
   renderPropertyKpis(rev, occ, delinquent.rows, leases.leases);
   renderUnitsTable(units.units);
+  renderUnitGrid(units.units);
   PROPERTY_OCC = occ; // property averages feed the unit modal's comparison stats
 
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -625,10 +648,13 @@ function leaseTimelineHtml(t, asOf) {
     </div>`;
 }
 
-document.getElementById("unitsBody").addEventListener("click", async (e) => {
+document.getElementById("unitsBody").addEventListener("click", (e) => {
   const row = e.target.closest("tr[data-unit-id]");
-  if (!row) return;
-  const detail = await api(`/units/${row.dataset.unitId}`);
+  if (row) openUnitDetail(row.dataset.unitId);
+});
+
+async function openUnitDetail(unitId) {
+  const detail = await api(`/units/${unitId}`);
   const t = detail.tenancy;
   const avgRent = PROPERTY_OCC?.avg_rent;
   const avgSqFt = PROPERTY_OCC?.avg_sq_ft;
@@ -675,7 +701,7 @@ document.getElementById("unitsBody").addEventListener("click", async (e) => {
     </div>`;
   unitModal.classList.add("open");
   unitModal.setAttribute("aria-hidden", "false");
-});
+}
 
 init().catch((err) => {
   console.error(err);
@@ -686,4 +712,147 @@ init().catch((err) => {
     "afterbegin",
     `<div style="position:fixed;top:0;left:0;right:0;z-index:999;background:#f87171;color:#1a0000;padding:10px;text-align:center;font-family:monospace;font-size:13px">Failed to load dashboard: ${err.message}</div>`
   );
+});
+
+/* ── unit grid: one cell per real unit, colored by real status, pannable and
+   zoomable like a seating chart. Rows/columns are ordered by unit number, NOT a
+   floor plan -- that geometry doesn't exist in the data and won't be faked. Cells
+   open the same unit detail modal as the table rows. ── */
+const GRID = { x: 0, y: 0, z: 1, w: 0, h: 0, dragging: false, moved: 0, px: 0, py: 0 };
+const GRID_CELL = 58, GRID_GAP = 6;
+
+function gridApply() {
+  const inner = document.getElementById("gridInner");
+  inner.style.transform = `translate(${GRID.x}px, ${GRID.y}px) scale(${GRID.z})`;
+  gridMinimapSync();
+}
+
+function gridMinimapSync() {
+  const vp = document.getElementById("gridViewport");
+  const mm = document.getElementById("gridMinimap");
+  const view = document.getElementById("mmView");
+  if (!vp || !mm || !GRID.w) return;
+  const mmW = mm.clientWidth, mmH = mm.clientHeight;
+  const sx = mmW / GRID.w, sy = mmH / GRID.h;
+  const vw = Math.min(1, vp.clientWidth / (GRID.w * GRID.z)) * mmW;
+  const vh = Math.min(1, vp.clientHeight / (GRID.h * GRID.z)) * mmH;
+  view.style.width = vw + "px";
+  view.style.height = vh + "px";
+  view.style.left = Math.max(0, Math.min(mmW - vw, (-GRID.x / GRID.z) * sx)) + "px";
+  view.style.top = Math.max(0, Math.min(mmH - vh, (-GRID.y / GRID.z) * sy)) + "px";
+}
+
+function gridFit() {
+  const vp = document.getElementById("gridViewport");
+  GRID.z = Math.min(1, (vp.clientWidth - 24) / GRID.w);
+  GRID.x = Math.max(12, (vp.clientWidth - GRID.w * GRID.z) / 2);
+  GRID.y = 12;
+  gridApply();
+}
+
+function renderUnitGrid(units) {
+  const inner = document.getElementById("gridInner");
+  const vp = document.getElementById("gridViewport");
+  document.getElementById("gridCount").textContent = `${units.length} units · ordered by unit number`;
+
+  const cols = Math.max(4, Math.ceil(Math.sqrt(units.length * 1.9)));
+  const rows = Math.ceil(units.length / cols);
+  GRID.w = cols * (GRID_CELL + GRID_GAP) + GRID_GAP;
+  GRID.h = rows * (GRID_CELL + GRID_GAP) + GRID_GAP;
+  inner.style.width = GRID.w + "px";
+  inner.style.height = GRID.h + "px";
+
+  const statusClass = (s) => {
+    if (s === "occupied") return "occupied";
+    if (s === "notice") return "notice";
+    if (s === "vacant" || !s) return "vacant";
+    return "other"; // model / down
+  };
+  inner.innerHTML = units.map((u, i) => {
+    const cx = (i % cols) * (GRID_CELL + GRID_GAP) + GRID_GAP;
+    const cy = Math.floor(i / cols) * (GRID_CELL + GRID_GAP) + GRID_GAP;
+    return `<div class="ug-cell ${statusClass(u.status)}" data-unit-id="${u.unit_id}"
+      style="left:${cx}px;top:${cy}px" title="${u.unit_number} · ${u.status || "vacant"}">
+      <span>${u.unit_number}</span></div>`;
+  }).join("");
+
+  // minimap proportions follow the grid's aspect ratio
+  const mm = document.getElementById("gridMinimap");
+  mm.style.height = Math.max(50, Math.min(110, 140 * (GRID.h / GRID.w))) + "px";
+
+  gridFit();
+
+  if (!vp.dataset.wired) {
+    vp.dataset.wired = "1";
+
+    vp.addEventListener("pointerdown", (e) => {
+      GRID.dragging = true; GRID.moved = 0; GRID.px = e.clientX; GRID.py = e.clientY;
+      vp.classList.add("grabbing");
+      // capture keeps the drag alive when the pointer leaves the viewport; it can
+      // throw for already-released pointers, and losing capture is not worth a crash
+      try { vp.setPointerCapture(e.pointerId); } catch {}
+    });
+    vp.addEventListener("pointermove", (e) => {
+      if (!GRID.dragging) return;
+      const dx = e.clientX - GRID.px, dy = e.clientY - GRID.py;
+      GRID.moved += Math.abs(dx) + Math.abs(dy);
+      GRID.x += dx; GRID.y += dy;
+      GRID.px = e.clientX; GRID.py = e.clientY;
+      gridApply();
+    });
+    vp.addEventListener("pointerup", (e) => {
+      GRID.dragging = false;
+      vp.classList.remove("grabbing");
+      // a click, not a drag: open the unit under the pointer
+      if (GRID.moved < 6) {
+        const cell = e.target.closest(".ug-cell");
+        if (cell) openUnitDetail(cell.dataset.unitId);
+      }
+    });
+
+    vp.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const rect = vp.getBoundingClientRect();
+      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+      const nz = Math.max(0.25, Math.min(2.5, GRID.z * (e.deltaY < 0 ? 1.12 : 0.9)));
+      // zoom toward the cursor: keep the grid point under it stationary
+      GRID.x = mx - ((mx - GRID.x) / GRID.z) * nz;
+      GRID.y = my - ((my - GRID.y) / GRID.z) * nz;
+      GRID.z = nz;
+      gridApply();
+    }, { passive: false });
+
+    const zoomBy = (f) => {
+      const vpr = vp.getBoundingClientRect();
+      const mx = vpr.width / 2, my = vpr.height / 2;
+      const nz = Math.max(0.25, Math.min(2.5, GRID.z * f));
+      GRID.x = mx - ((mx - GRID.x) / GRID.z) * nz;
+      GRID.y = my - ((my - GRID.y) / GRID.z) * nz;
+      GRID.z = nz;
+      gridApply();
+    };
+    document.getElementById("gridZoomIn").addEventListener("click", () => zoomBy(1.25));
+    document.getElementById("gridZoomOut").addEventListener("click", () => zoomBy(0.8));
+    document.getElementById("gridZoomReset").addEventListener("click", gridFit);
+
+    // click the minimap to jump the viewport there
+    document.getElementById("gridMinimap").addEventListener("click", (e) => {
+      const mm = document.getElementById("gridMinimap");
+      const r = mm.getBoundingClientRect();
+      const fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+      GRID.x = -(fx * GRID.w * GRID.z) + vp.clientWidth / 2;
+      GRID.y = -(fy * GRID.h * GRID.z) + vp.clientHeight / 2;
+      gridApply();
+    });
+  }
+}
+
+/* grid/table tab switch inside the property view */
+document.getElementById("propTabs").addEventListener("click", (e) => {
+  const tab = e.target.closest("#propTabs .dash-tab");
+  if (!tab) return;
+  document.querySelectorAll("#propTabs .dash-tab").forEach((t) => t.classList.toggle("on", t === tab));
+  document.querySelectorAll(".prop-pane").forEach((p) => {
+    p.style.display = p.dataset.ppane === tab.dataset.ptab ? "" : "none";
+  });
 });
