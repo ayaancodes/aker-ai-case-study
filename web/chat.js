@@ -533,3 +533,11 @@ copilotInput.addEventListener("keydown", (e) => { if (e.key === "Enter") sendMes
 copilotSuggest?.querySelectorAll("button").forEach((b) =>
   b.addEventListener("click", () => sendMessage(b.dataset.q))
 );
+
+// arriving from a dashboard watchpoint: ?q= pre-asks the question. Lives at the
+// bottom of the file on purpose: sendMessage touches let-bound state (FOLLOWING,
+// etc.) that would still be in the temporal dead zone if this ran at the top.
+(function () {
+  const q = new URLSearchParams(location.search).get("q");
+  if (q) sendMessage(q);
+})();

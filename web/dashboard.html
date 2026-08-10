@@ -207,6 +207,13 @@
               <div class="units-tools">
                 <input type="text" id="unitSearch" placeholder="Find unit or resident&hellip;" autocomplete="off">
                 <select id="unitStatusFilter"><option value="">All statuses</option></select>
+                <select id="unitSort">
+                  <option value="">Unit number</option>
+                  <option value="rent-asc">Rent: low to high</option>
+                  <option value="rent-desc">Rent: high to low</option>
+                  <option value="balance-desc">Balance: largest first</option>
+                </select>
+                <label class="units-balance-toggle"><input type="checkbox" id="unitBalanceOnly"> Balances only</label>
               </div>
             </div>
             <div class="units-table-wrap">

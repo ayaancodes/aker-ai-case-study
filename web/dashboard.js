@@ -223,12 +223,27 @@ function renderSignals(stats, anomalies) {
     });
   }
 
-  document.getElementById("signalsBody").innerHTML = signals.map((s) => `
-    <div class="signal">
+  // each watchpoint leads somewhere concrete: the worst missing-charges property,
+  // the copilot pre-asked about holdovers, the anomalies feed for the date errors.
+  // Destinations are hardcoded to this dataset's known findings, per sign-off.
+  const actions = [
+    { hint: "See Kinwood (175) &rarr;", go: () => showPropertyView("175") },
+    { hint: "Ask the copilot &rarr;", go: () => { window.location.href = "copilot.html?q=" + encodeURIComponent("Which leases already expired and were never renewed?"); } },
+    { hint: "View the flags &rarr;", go: () => { window.location.href = "how-it-works.html#anomalies"; } },
+  ];
+  document.getElementById("signalsBody").innerHTML = signals.map((s, i) => `
+    <div class="signal clickable" data-signal="${i}" role="button" tabindex="0">
       <div class="signal-text">${s.text}</div>
       <div class="signal-tags">${s.tags.map((t) => `<span class="signal-tag"><span class="sdot"></span>${t}</span>`).join("")}</div>
+      <div class="signal-go mono">${actions[i]?.hint ?? ""}</div>
     </div>
-  `).join("") + `<a class="signals-evidence" href="how-it-works.html#anomalies">View evidence &rarr;</a>`;
+  `).join("");
+  document.querySelectorAll(".signal.clickable").forEach((el) => {
+    const act = actions[+el.dataset.signal];
+    if (!act) return;
+    el.addEventListener("click", act.go);
+    el.addEventListener("keydown", (e) => { if (e.key === "Enter") act.go(); });
+  });
 }
 
 function renderSidebar(sorted, query = "") {
@@ -554,6 +569,8 @@ function renderUnitsTable(units) {
   document.getElementById("unitStatusFilter").innerHTML =
     `<option value="">All statuses</option>` + statuses.map((s) => `<option value="${s}">${s}</option>`).join("");
   document.getElementById("unitSearch").value = "";
+  document.getElementById("unitSort").value = "";
+  document.getElementById("unitBalanceOnly").checked = false;
 
   applyUnitFilters();
 }
@@ -561,15 +578,22 @@ function renderUnitsTable(units) {
 function applyUnitFilters() {
   const q = document.getElementById("unitSearch").value.trim().toLowerCase();
   const status = document.getElementById("unitStatusFilter").value;
+  const sort = document.getElementById("unitSort").value;
+  const balanceOnly = document.getElementById("unitBalanceOnly").checked;
 
-  const filtered = PROPERTY_UNITS.filter((u) => {
+  let filtered = PROPERTY_UNITS.filter((u) => {
     if (status && (u.status || "vacant") !== status) return false;
+    if (balanceOnly && !(u.balance && u.balance > 0)) return false;
     if (q && !(
       u.unit_number.toLowerCase().includes(q) ||
       (u.resident_name || "").toLowerCase().includes(q)
     )) return false;
     return true;
   });
+
+  if (sort === "rent-asc") filtered = [...filtered].sort((a, b) => (a.market_rent || 0) - (b.market_rent || 0));
+  else if (sort === "rent-desc") filtered = [...filtered].sort((a, b) => (b.market_rent || 0) - (a.market_rent || 0));
+  else if (sort === "balance-desc") filtered = [...filtered].sort((a, b) => (b.balance || 0) - (a.balance || 0));
 
   document.getElementById("unitsCount").textContent =
     filtered.length === PROPERTY_UNITS.length
@@ -593,6 +617,8 @@ function applyUnitFilters() {
 
 document.getElementById("unitSearch").addEventListener("input", applyUnitFilters);
 document.getElementById("unitStatusFilter").addEventListener("change", applyUnitFilters);
+document.getElementById("unitSort").addEventListener("change", applyUnitFilters);
+document.getElementById("unitBalanceOnly").addEventListener("change", applyUnitFilters);
 
 /* ── unit detail modal: click a row -> /units/{id} -> tenancy facts + real charge
    lines. No history section on purpose (one snapshot loaded); if a billable unit has
@@ -744,6 +770,7 @@ function gridMinimapSync() {
 
 function gridFit() {
   const vp = document.getElementById("gridViewport");
+  if (!vp.clientWidth || !GRID.w) return; // hidden pane: refit happens on tab switch
   GRID.z = Math.min(1, (vp.clientWidth - 24) / GRID.w);
   GRID.x = Math.max(12, (vp.clientWidth - GRID.w * GRID.z) / 2);
   GRID.y = 12;
@@ -753,6 +780,14 @@ function gridFit() {
 function renderUnitGrid(units) {
   const inner = document.getElementById("gridInner");
   const vp = document.getElementById("gridViewport");
+
+  // a new property always opens on the grid tab -- without this, the tab state
+  // leaks across properties and gridFit can run against a hidden zero-width pane
+  document.querySelectorAll("#propTabs .dash-tab").forEach((t) =>
+    t.classList.toggle("on", t.dataset.ptab === "grid"));
+  document.querySelectorAll(".prop-pane").forEach((p) => {
+    p.style.display = p.dataset.ppane === "grid" ? "" : "none";
+  });
   document.getElementById("gridCount").textContent = `${units.length} units · ordered by unit number`;
 
   const cols = Math.max(4, Math.ceil(Math.sqrt(units.length * 1.9)));
@@ -787,6 +822,9 @@ function renderUnitGrid(units) {
 
     vp.addEventListener("pointerdown", (e) => {
       GRID.dragging = true; GRID.moved = 0; GRID.px = e.clientX; GRID.py = e.clientY;
+      // record the cell NOW: setPointerCapture retargets every later pointer event
+      // (including pointerup) to the viewport, so e.target is useless by then
+      GRID.downCell = e.target.closest(".ug-cell");
       vp.classList.add("grabbing");
       // capture keeps the drag alive when the pointer leaves the viewport; it can
       // throw for already-released pointers, and losing capture is not worth a crash
@@ -800,14 +838,14 @@ function renderUnitGrid(units) {
       GRID.px = e.clientX; GRID.py = e.clientY;
       gridApply();
     });
-    vp.addEventListener("pointerup", (e) => {
+    vp.addEventListener("pointerup", () => {
       GRID.dragging = false;
       vp.classList.remove("grabbing");
-      // a click, not a drag: open the unit under the pointer
-      if (GRID.moved < 6) {
-        const cell = e.target.closest(".ug-cell");
-        if (cell) openUnitDetail(cell.dataset.unitId);
+      // a click, not a drag: open the unit recorded at pointerdown
+      if (GRID.moved < 6 && GRID.downCell) {
+        openUnitDetail(GRID.downCell.dataset.unitId);
       }
+      GRID.downCell = null;
     });
 
     vp.addEventListener("wheel", (e) => {
@@ -855,4 +893,7 @@ document.getElementById("propTabs").addEventListener("click", (e) => {
   document.querySelectorAll(".prop-pane").forEach((p) => {
     p.style.display = p.dataset.ppane === tab.dataset.ptab ? "" : "none";
   });
+  // the pane was display:none while hidden, so any fit computed then used a
+  // zero-width viewport -- refit now that it's visible
+  if (tab.dataset.ptab === "grid") gridFit();
 });
