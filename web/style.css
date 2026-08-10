@@ -523,9 +523,25 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;position:relative;z-
 
 @media (max-width:960px){
   .dash-layout{grid-template-columns:1fr}
+  /* grid items default to min-width:auto, so they refuse to shrink below their
+     min-content and burst the 1fr track -- this is what made the whole dashboard
+     scroll sideways on a phone. Let them shrink; inner scroll containers
+     (units table, chart bodies) already handle their own overflow. */
+  .dash-sidebar,.dash-main{min-width:0}
   .dash-sidebar{position:static;height:auto}
   .dash-kpi-strip{grid-template-columns:repeat(2,1fr)}
   .dash-grid-2{grid-template-columns:1fr}
+  .copilot-layout{grid-template-columns:1fr}
+  .copilot-sidebar,.copilot-main{min-width:0}
+  .copilot-sidebar{position:static;height:auto}
+}
+@media (max-width:560px){
+  .dash-kpi-strip{grid-template-columns:1fr}
+  .dash-main{padding:22px 16px 48px}
+  .signals-row{flex-direction:column}
+  .signals-row .signal{border-right:none;margin-right:0;padding-right:0}
+  .units-tools{width:100%}
+  .units-tools input[type="text"]{width:100%}
 }
 
 @media (max-width:960px){
@@ -838,3 +854,17 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;position:relative;z-
 @media (prefers-reduced-motion: reduce){
   .ug-cell.ug-in,.view-in{animation:none}
 }
+
+
+/* ── empty states: never a silent blank panel. A property with no units at all is a
+   real data quality finding, so it says so and links to the evidence. ── */
+.units-empty{padding:34px 4px;text-align:center;font-size:13px;color:var(--dim);line-height:1.6}
+.units-empty a{color:var(--cyan)}
+.units-clear{font-family:'JetBrains Mono';font-size:11px;color:var(--cyan);background:transparent;
+  border:1px solid rgba(127,199,155,.3);border-radius:8px;padding:5px 11px;margin-left:8px;cursor:pointer;
+  transition:background .2s ease,border-color .2s ease}
+.units-clear:hover{background:rgba(127,199,155,.08);border-color:rgba(127,199,155,.5)}
+.grid-empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;
+  padding:0 12%;font-size:13px;color:var(--dim);line-height:1.6}
+.grid-empty a{color:var(--cyan)}
+.dash-side-empty{font-size:12.5px;color:var(--faint);padding:14px 12px;line-height:1.5}

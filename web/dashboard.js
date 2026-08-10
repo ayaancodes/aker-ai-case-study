@@ -326,7 +326,8 @@ function renderSidebar(sorted, query = "") {
         <span class="pi-amt mono">${fmtMoney(p.net_effective_revenue)}</span>
       </div>
     `).join("");
-    list.innerHTML = allItem + items;
+    list.innerHTML = allItem + items +
+      (matches.length ? "" : `<div class="dash-side-empty">No property matches that search.</div>`);
   }
 
   list.querySelectorAll(".dash-pitem").forEach((el) => {
@@ -649,7 +650,26 @@ function applyUnitFilters() {
       ? `${PROPERTY_UNITS.length} units`
       : `${filtered.length} of ${PROPERTY_UNITS.length} units`;
 
-  document.getElementById("unitsBody").innerHTML = filtered.map((u) => {
+  // an empty result must say why, not leave a blank panel. A property with no units
+  // at all is a real data quality finding (3 source files are structurally empty),
+  // so name it rather than showing nothing.
+  const tbody = document.getElementById("unitsBody");
+  if (!filtered.length) {
+    const reason = !PROPERTY_UNITS.length
+      ? `No units in this property's rent roll. Its source file is one of the three that came through structurally empty, which is flagged on the <a href="how-it-works.html#anomalies">anomalies feed</a>.`
+      : `No units match these filters. <button class="units-clear" id="unitsClear">Clear filters</button>`;
+    tbody.innerHTML = `<tr><td colspan="8"><div class="units-empty">${reason}</div></td></tr>`;
+    document.getElementById("unitsClear")?.addEventListener("click", () => {
+      document.getElementById("unitSearch").value = "";
+      document.getElementById("unitStatusFilter").value = "";
+      document.getElementById("unitSort").value = "";
+      document.getElementById("unitBalanceOnly").checked = false;
+      applyUnitFilters();
+    });
+    return;
+  }
+
+  tbody.innerHTML = filtered.map((u) => {
     const status = u.status || "vacant";
     return `<tr data-unit-id="${u.unit_id}">
       <td class="strong">${u.unit_number}</td>
@@ -852,6 +872,14 @@ function renderUnitGrid(units) {
     if (s === "vacant" || !s) return "vacant";
     return "other"; // model / down
   };
+  if (!units.length) {
+    inner.innerHTML = "";
+    inner.style.width = inner.style.height = "";
+    document.getElementById("gridEmpty").hidden = false;
+    return;
+  }
+  document.getElementById("gridEmpty").hidden = true;
+
   inner.innerHTML = units.map((u, i) => {
     const cx = (i % cols) * (GRID_CELL + GRID_GAP) + GRID_GAP;
     const cy = Math.floor(i / cols) * (GRID_CELL + GRID_GAP) + GRID_GAP;
