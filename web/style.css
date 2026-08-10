@@ -788,3 +788,40 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;position:relative;z-
   color:var(--cyan);background:transparent;border:1px dashed rgba(127,199,155,.3);border-radius:9px;
   padding:9px 12px;cursor:pointer;transition:border-color .2s ease,background .2s ease}
 .dash-change-prop:hover{border-color:rgba(127,199,155,.55);background:rgba(127,199,155,.06)}
+
+
+/* ───────── AMBIENT BACKGROUND — slow drifting orbs so the app reads as alive
+   without competing with the data. Sits behind everything; the app layouts get
+   position/z-index so content always paints above it. ───────── */
+.ambient{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:0}
+.ambient i{position:absolute;display:block;border-radius:50%;filter:blur(100px)}
+.ambient .a1{width:560px;height:560px;top:-140px;left:8%;
+  background:radial-gradient(circle,rgba(127,199,155,.16),transparent 68%);
+  animation:amb-1 42s ease-in-out infinite}
+.ambient .a2{width:640px;height:640px;bottom:-220px;right:4%;
+  background:radial-gradient(circle,rgba(62,107,79,.22),transparent 68%);
+  animation:amb-2 55s ease-in-out infinite}
+.ambient .a3{width:420px;height:420px;top:38%;left:52%;
+  background:radial-gradient(circle,rgba(201,169,106,.07),transparent 68%);
+  animation:amb-3 68s ease-in-out infinite}
+@keyframes amb-1{
+  0%,100%{transform:translate(0,0) scale(1)}
+  33%{transform:translate(120px,70px) scale(1.12)}
+  66%{transform:translate(-60px,130px) scale(.94)}}
+@keyframes amb-2{
+  0%,100%{transform:translate(0,0) scale(1)}
+  40%{transform:translate(-150px,-90px) scale(1.08)}
+  75%{transform:translate(70px,-40px) scale(.96)}}
+@keyframes amb-3{
+  0%,100%{transform:translate(0,0) scale(1);opacity:.7}
+  50%{transform:translate(-180px,90px) scale(1.2);opacity:1}}
+/* content sits above the ambient layer */
+.dash-layout,.copilot-layout{position:relative;z-index:1}
+@media (prefers-reduced-motion: reduce){.ambient i{animation:none}}
+
+/* app pages: the nav is a full-width status strip (logo now lives in the sidebar,
+   so the bar carries only the live clock, pinned right) */
+.nav-in.app-nav{max-width:none;justify-content:flex-end}
+
+/* the wordmark at the true top-left, heading the sidebar */
+.side-logo{padding:2px 10px 20px;margin-bottom:4px}
