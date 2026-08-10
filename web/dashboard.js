@@ -823,6 +823,11 @@ function renderUnitGrid(units) {
     vp.dataset.wired = "1";
 
     vp.addEventListener("pointerdown", (e) => {
+      // presses that start on the zoom controls or minimap are button presses, not
+      // pans. Without this the viewport captures the pointer, which retargets the
+      // pointerup and stops `click` from ever firing on the button -- the reset
+      // control looked dead for exactly this reason.
+      if (e.target.closest(".grid-zoom, .grid-minimap")) return;
       GRID.dragging = true; GRID.moved = 0; GRID.px = e.clientX; GRID.py = e.clientY;
       // record the cell NOW: setPointerCapture retargets every later pointer event
       // (including pointerup) to the viewport, so e.target is useless by then

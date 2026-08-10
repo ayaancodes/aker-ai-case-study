@@ -216,7 +216,7 @@ function initPipelineDive() {
   });
 }
 
-/* ── layer deep dives: what we did / what we found, per architecture layer. All
+/* ── layer deep dives: what I did / what I found, per architecture layer. All
    real catches from this build -- sources: CLAUDE.md sections 1/6/7 and the live
    investigations run during this session. Matter-of-fact on purpose. ── */
 const LAYER_DIVES = {
@@ -286,9 +286,9 @@ function initLayerDives() {
         <div class="gate-eyebrow">${d.tag}</div>
         <h2>${d.title}</h2>
         <div class="layer-dive-grid">
-          <div><div class="layer-dive-h">WHAT WE DID</div>
+          <div><div class="layer-dive-h">WHAT I DID</div>
             ${d.did.map((t) => `<div class="dive-item">${t}</div>`).join("")}</div>
-          <div><div class="layer-dive-h found">WHAT WE FOUND</div>
+          <div><div class="layer-dive-h found">WHAT I FOUND</div>
             ${d.found.map((t) => `<div class="dive-item found">${t}</div>`).join("")}</div>
         </div>`;
       modal.classList.add("open");
