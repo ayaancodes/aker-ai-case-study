@@ -866,5 +866,9 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;position:relative;z-
 .units-clear:hover{background:rgba(127,199,155,.08);border-color:rgba(127,199,155,.5)}
 .grid-empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;
   padding:0 12%;font-size:13px;color:var(--dim);line-height:1.6}
+/* an author `display:grid` beats the UA sheet's [hidden]{display:none} regardless of
+   specificity, so the overlay stayed on top of every populated grid -- showing the
+   wrong message and, being inset:0, swallowing every cell click. */
+.grid-empty[hidden]{display:none}
 .grid-empty a{color:var(--cyan)}
 .dash-side-empty{font-size:12.5px;color:var(--faint);padding:14px 12px;line-height:1.5}

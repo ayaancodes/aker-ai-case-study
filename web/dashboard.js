@@ -70,6 +70,7 @@ async function init() {
   // data is rendered: swap the loading state for the real content
   document.getElementById("dashLoading").remove();
   document.getElementById("dashContent").hidden = false;
+  redrawKpiViz(); // the strip has real dimensions only now
   countUpKpis();
 
   observeReveals();
@@ -400,6 +401,22 @@ const KPI_ICONS = {
   cal: `<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>`,
 };
 
+/* ── KPI mini-charts. These draw into fixed-size canvases via fitCanvas, which reads
+   clientWidth/clientHeight -- both 0 inside a display:none container, producing a 0x0
+   backing store that never repairs itself since nothing redraws. The portfolio KPIs
+   are rendered by init() *before* #dashContent is unhidden, so they were silently
+   blank on every load. Keeping the draw pass here lets it be replayed once the strip
+   is actually visible, and again on resize. ── */
+let KPI_VIZ = null;
+function setKpiViz(fn) { KPI_VIZ = fn; fn(); }
+function redrawKpiViz() { if (KPI_VIZ) KPI_VIZ(); }
+
+let kpiResizeTimer = null;
+window.addEventListener("resize", () => {
+  clearTimeout(kpiResizeTimer);
+  kpiResizeTimer = setTimeout(redrawKpiViz, 150);
+});
+
 function kpiTile(value, label, vizId, legend, pop, icon) {
   const ic = icon ? `<div class="ki">${KPI_ICONS[icon]}</div>` : "";
   const viz = vizId ? `<canvas id="${vizId}"></canvas>` : "";
@@ -517,17 +534,23 @@ function renderPortfolioKpis(revenue, occupancy, delinquent, leases, leaseRefDat
     kpiTile(leases.length, "Leases rolling over (60d)",
       "kpiRollViz", `${within30} WITHIN 30D · ${leases.length - within30} IN 31-60D`, rolloverPop, "cal");
 
-  drawKpiBars("kpiNetViz", [...revenue.by_property].map((p) => p.net_effective_revenue).sort((a, b) => b - a));
-  drawKpiSegments("kpiGrossViz", [
-    { value: revenue.total_gross_revenue, color: "#7FC79B" },
-    { value: Math.abs(revenue.total_concessions), color: "#E2836F" },
-  ]);
-  if (occupancy.pct_occ != null) drawKpiProgress("kpiOccViz", occupancy.pct_occ);
-  drawKpiBars("kpiDelViz", delinquent.map((r) => r.balance).sort((a, b) => b - a).slice(0, 24));
-  drawKpiSegments("kpiRollViz", [
-    { value: within30 || 0.0001, color: "#C9A96A" },
-    { value: (leases.length - within30) || 0.0001, color: "rgba(201,169,106,.35)" },
-  ]);
+  // Registered rather than just called: fitCanvas sizes off clientWidth/clientHeight,
+  // so drawing while the container is still display:none produces a 0x0 canvas that
+  // never recovers. init() renders these before it unhides #dashContent, so the draw
+  // pass has to be replayable -- and replayed again on resize, which nothing handled.
+  setKpiViz(() => {
+    drawKpiBars("kpiNetViz", [...revenue.by_property].map((p) => p.net_effective_revenue).sort((a, b) => b - a));
+    drawKpiSegments("kpiGrossViz", [
+      { value: revenue.total_gross_revenue, color: "#7FC79B" },
+      { value: Math.abs(revenue.total_concessions), color: "#E2836F" },
+    ]);
+    if (occupancy.pct_occ != null) drawKpiProgress("kpiOccViz", occupancy.pct_occ);
+    drawKpiBars("kpiDelViz", delinquent.map((r) => r.balance).sort((a, b) => b - a).slice(0, 24));
+    drawKpiSegments("kpiRollViz", [
+      { value: within30 || 0.0001, color: "#C9A96A" },
+      { value: (leases.length - within30) || 0.0001, color: "rgba(201,169,106,.35)" },
+    ]);
+  });
 }
 
 function renderPropertyKpis(rev, occ, delinquent, leases) {
@@ -567,17 +590,19 @@ function renderPropertyKpis(rev, occ, delinquent, leases) {
       "kpiPDelViz", "TOP 5 BALANCES + REST · HOVER FOR NAMES", delinquentPop, "alert") +
     kpiTile(leases.length, "Rolling over (60d)", null, "HOVER FOR NEXT EXPIRATIONS", rolloverPop, "cal");
 
-  drawKpiSegments("kpiPNetViz", [
-    { value: rev.net_effective_revenue || 0.0001, color: "#4CAF82" },
-    { value: Math.abs(rev.concessions), color: "#E2836F" },
-  ]);
-  if (occ.pct_occ != null) drawKpiProgress("kpiPOccViz", occ.pct_occ);
-  drawKpiSegments("kpiPUnitsViz", [
-    { value: occ.occupied || 0.0001, color: "#4CAF82" },
-    { value: occ.on_notice, color: "#C9A96A" },
-    { value: occ.vacant, color: "#E2836F" },
-  ].filter((s) => s.value > 0));
-  drawKpiSegments("kpiPDelViz", topSegments(delinquent, (r) => r.balance).map((s) => ({ ...s, color: s.color === "rgba(148,163,184,.25)" ? s.color : "#E2836F" })));
+  setKpiViz(() => {
+    drawKpiSegments("kpiPNetViz", [
+      { value: rev.net_effective_revenue || 0.0001, color: "#4CAF82" },
+      { value: Math.abs(rev.concessions), color: "#E2836F" },
+    ]);
+    if (occ.pct_occ != null) drawKpiProgress("kpiPOccViz", occ.pct_occ);
+    drawKpiSegments("kpiPUnitsViz", [
+      { value: occ.occupied || 0.0001, color: "#4CAF82" },
+      { value: occ.on_notice, color: "#C9A96A" },
+      { value: occ.vacant, color: "#E2836F" },
+    ].filter((s) => s.value > 0));
+    drawKpiSegments("kpiPDelViz", topSegments(delinquent, (r) => r.balance).map((s) => ({ ...s, color: s.color === "rgba(148,163,184,.25)" ? s.color : "#E2836F" })));
+  });
 }
 
 function renderRevenueChart(sorted) {
