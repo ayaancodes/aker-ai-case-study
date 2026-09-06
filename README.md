@@ -1,11 +1,12 @@
-# Aker AI — Round 2 Case Study
+# Aker AI — Production Platform Contract
+
+*Developed under a paid contract to build a production-grade intelligence platform for a real estate investment firm.*
 
 ### [**aker-ai-terminal.onrender.com**](https://aker-ai-terminal.onrender.com)
 
-Free tier, so the first load after a while can take ~30s to wake up. Everything on it
-is real: a relational schema, an ETL loader, an API, a dashboard, and a tool-calling
-chatbot, all built on top of 50 actual Excel exports (25 properties' worth of rent
-rolls and unit availability reports).
+*(Note: Deployed on a free-tier environment, so the initial load may take ~30s to wake up.)* 
+
+This repository contains the complete production platform: a robust relational schema, an automated ETL loader, a REST API, a centralized dashboard, and a tool-calling chatbot. The system was engineered from the ground up to process, normalize, and query 50 raw Excel exports (comprising 25 properties' worth of rent rolls and unit availability reports) into a single actionable intelligence layer.
 
 ## The assignment
 
