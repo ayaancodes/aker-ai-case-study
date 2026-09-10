@@ -28,3 +28,6 @@ ENV/
 .DS_Store
 
 pytest_cache
+
+# Internal build log, not for public repo
+CLAUDE.md

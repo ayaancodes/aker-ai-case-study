@@ -1,7 +1,5 @@
 :root{
   color-scheme:dark;
-  /* Aker colourway, promoted app-wide from the copilot page after sign-off:
-     charcoal with a green cast, cream ink, institutional green accent, amber watch */
   --void:#0B0D0C;--void-2:#101412;
   --glass:rgba(237,235,228,.045);--glass-2:rgba(237,235,228,.03);
   --line:rgba(154,164,157,.16);--line-2:rgba(154,164,157,.09);
@@ -65,7 +63,6 @@ section{position:relative}
 nav{position:fixed;top:0;left:0;right:0;z-index:50;backdrop-filter:blur(16px);background:rgba(9,12,10,.86);border-bottom:1px solid transparent;transition:border-color .3s}
 nav.scrolled{border-bottom-color:var(--line)}
 .nav-in{max-width:1180px;margin:0 auto;padding:16px 28px;display:flex;align-items:center;gap:30px}
-/* wordmark after Aker AI's own lockup: lambda-style glyph, AKER, an AI pill */
 .logo{display:flex;align-items:center;gap:9px;text-decoration:none;color:var(--ink)}
 .logo-glyph{width:21px;height:21px;stroke:var(--ink);fill:none;stroke-width:2.1;stroke-linecap:round;flex:none}
 .logo-word{font-family:'Bricolage Grotesque';font-weight:700;font-size:15.5px;letter-spacing:.16em}
@@ -360,8 +357,6 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;position:relative;z-
 @keyframes dash-spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion: reduce){.dash-spinner{animation:none;border-top-color:var(--line)}}
 
-/* header block after Aker's AM Dashboard: eyebrow, big title, real fact chips, and
-   Healthy/Watch status chips computed live from data quality flags */
 .dash-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;
   flex-wrap:wrap;margin-bottom:24px}
 .dash-prop-bar{margin-bottom:22px;padding-bottom:20px;border-bottom:1px solid var(--line-2)}
@@ -381,10 +376,8 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;position:relative;z-
 .status-chip.healthy .sdot{background:var(--profit);box-shadow:0 0 8px var(--profit)}
 .status-chip.watch .sdot{background:var(--warn);box-shadow:0 0 8px var(--warn)}
 
-/* suite links block above the property finder, like Aker's left rail */
 .dash-suite{display:flex;flex-direction:column;gap:2px;margin-bottom:20px}
 
-/* tab chips switching the portfolio panels, like their Overview/Financial/Operational */
 .dash-tabs{display:flex;gap:8px;margin-bottom:18px}
 .dash-tab{font-family:'Instrument Sans';font-weight:600;font-size:13px;color:var(--dim);cursor:pointer;
   background:var(--glass-2);border:1px solid var(--line);border-radius:10px;padding:9px 18px;
@@ -649,7 +642,7 @@ footer{border-top:1px solid var(--line);padding:44px 0 52px;position:relative;z-
 
 /* grounding check: a $/% figure the model stated that didn't trace back to any tool
    result this turn. Not blocking -- flagged, same as a data quality issue elsewhere
-   in this app. Amber on this page, matching Aker's watch-state chips. */
+   in this app. */
 .copilot-grounding-warn{font-family:'JetBrains Mono';font-size:10px;color:var(--warn,#C9A96A);
   background:rgba(201,169,106,.07);border:1px solid rgba(201,169,106,.3);border-radius:8px;
   padding:5px 10px;margin-left:36px;max-width:calc(100% - 36px)}

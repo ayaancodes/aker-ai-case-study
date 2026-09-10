@@ -1,6 +1,6 @@
 """
 Tests the FastAPI layer against the real loaded database via FastAPI's TestClient (in
-process, no server needed). Sets AKER_DB_PATH explicitly to the real db/aker.db so this
+process, no server needed). Sets DB_PATH explicitly to the real db/portfolio.db so this
 doesn't depend on the test runner's current working directory.
 """
 
@@ -14,14 +14,14 @@ from fastapi.testclient import TestClient
 # loading it under a different module name than an explicit `tests.conftest` import --
 # recomputing the same two lines locally sidesteps that ambiguity entirely.
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-REAL_DB_PATH = os.path.join(PROJECT_ROOT, "db", "aker.db")
+REAL_DB_PATH = os.path.join(PROJECT_ROOT, "db", "portfolio.db")
 
 
 @pytest.fixture
 def client():
     if not os.path.exists(REAL_DB_PATH):
-        pytest.skip("db/aker.db not found -- run scripts/load_data.py first")
-    os.environ["AKER_DB_PATH"] = REAL_DB_PATH
+        pytest.skip("db/portfolio.db not found -- run scripts/load_data.py first")
+    os.environ["DB_PATH"] = REAL_DB_PATH
     from api.main import app
     return TestClient(app)
 

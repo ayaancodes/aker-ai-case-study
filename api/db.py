@@ -3,7 +3,7 @@
 import os
 import sqlite3
 
-DB_PATH = os.environ.get("AKER_DB_PATH", "db/aker.db")
+DB_PATH = os.environ.get("DB_PATH", "db/portfolio.db")
 
 
 def get_connection():

@@ -1,5 +1,5 @@
 """
-Regression tests against the real, loaded db/aker.db (built by `python3
+Regression tests against the real, loaded db/portfolio.db (built by `python3
 scripts/load_data.py` from the actual 25+25 source files).
 
 These lock in the numbers that were independently re-verified during the August 2026

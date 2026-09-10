@@ -1,4 +1,4 @@
-# Aker AI — Round 2 Case Study
+# Agentic Terminal
 
 ### [**aker-ai-terminal.onrender.com**](https://aker-ai-terminal.onrender.com)
 
@@ -7,11 +7,12 @@ is real: a relational schema, an ETL loader, an API, a dashboard, and a tool-cal
 chatbot, all built on top of 50 actual Excel exports (25 properties' worth of rent
 rolls and unit availability reports).
 
-## The assignment
-
-1. Design a relational database schema to store as much data as possible from the Excel files.
-2. Develop a Python script to process all the files and load the data into the database.
-3. Build a presentation layer (dashboard, LLM chatbot, or something else) that showcases skills.
+Started as a take-home technical exercise for a job application: design a schema,
+build a loader, and put a presentation layer on top of a stack of messy real-world
+property management data. Kept going past the original brief because the data
+quality problems underneath (missing charges, impossible dates, duplicate properties
+hiding across differently-named files) turned out to be more interesting than the
+base assignment, so this became a small personal project in its own right.
 
 ## Start here: [How it's built](https://aker-ai-terminal.onrender.com/how-it-works.html)
 
@@ -23,7 +24,7 @@ version:
 ```mermaid
 flowchart LR
     A["50 Excel files\nRent Roll + Unit Availability"] --> B["ETL loader\nscripts/load_data.py"]
-    B --> C[("SQLite\ndb/aker.db")]
+    B --> C[("SQLite\ndb/portfolio.db")]
     C --> D["API\napi/main.py"]
     D --> E["Dashboard\nweb/dashboard.html"]
     D --> F["Copilot\napi/chat.py"]
@@ -45,13 +46,12 @@ time, not smoothed over.
 | `api/chat.py` | The chatbot's tool-calling agent loop over the Claude API, plus the grounding check that verifies every number it states against a real tool result. |
 | `web/` | The frontend: `dashboard.html`, `copilot.html`, `how-it-works.html`, all vanilla JS/CSS. |
 | `tests/` | 54 tests — idempotency, known-good row counts, and regression coverage for every real bug found along the way. Run with `pytest tests/ -v`. |
-| `CLAUDE.md` | The full build log, phase by phase, in the order it actually happened — goal, what was done, what was found. |
 
 ## Running it locally
 
 ```bash
 pip install -r requirements.txt
-python3 scripts/load_data.py        # builds db/aker.db from the source Excel files
+python3 scripts/load_data.py        # builds db/portfolio.db from the source Excel files
 uvicorn api.main:app --reload       # serves the API + the frontend on :8000
 ```
 

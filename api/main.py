@@ -1,5 +1,5 @@
 """
-FastAPI backend for the Aker portfolio. Each endpoint is deliberately narrow and
+FastAPI backend for the real estate portfolio. Each endpoint is deliberately narrow and
 single-purpose -- these double as tool definitions for the LLM chatbot later, so a
 clean, predictable shape here matters more than for a typical CRUD API.
 
@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from api.chat import ChatRequest, stream_chat
 from api.db import DB_PATH, get_connection
 
-app = FastAPI(title="Aker Portfolio API")
+app = FastAPI(title="Portfolio API")
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 

@@ -1,4 +1,4 @@
--- Aker AI case study schema
+-- Real estate portfolio schema
 -- SQLite. Normalized tables + views for hot-path aggregates.
 -- See CLAUDE.md "Schema (locked)" section for design rationale.
 

@@ -24,7 +24,7 @@ from api.db import DB_PATH
 
 load_dotenv()
 
-logger = logging.getLogger("aker.chat.grounding")
+logger = logging.getLogger("terminal.chat.grounding")
 
 MODEL = "claude-haiku-4-5-20251001"
 MAX_TOKENS = 450
@@ -37,7 +37,7 @@ MAX_TOOL_ITERATIONS = 6
 # the first N keeps the part a human would actually look at.
 MODEL_LIST_CAP = 20
 
-SYSTEM_PROMPT = """You are the Aker Portfolio Terminal copilot -- a real estate portfolio
+SYSTEM_PROMPT = """You are the Portfolio Terminal copilot -- a real estate portfolio
 analyst embedded in a dashboard covering 15 properties, ~4,100 tenancies, loaded from a
 single month's Rent Roll and Unit Availability snapshot.
 

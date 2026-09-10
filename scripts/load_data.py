@@ -3,7 +3,7 @@ Loads all Rent Roll and Unit Availability .xlsx files into the SQLite database.
 
 Usage:
     python3 scripts/load_data.py
-    python3 scripts/load_data.py --data-dir "Aker Case Study Data" --db db/aker.db
+    python3 scripts/load_data.py --data-dir "Property Data" --db db/portfolio.db
 
 Design notes (see CLAUDE.md "Loader best practices" and the audit section for what
 changed and why):
@@ -227,9 +227,9 @@ def load_unit_availability_file(conn, filepath):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Load Aker rent roll / unit availability Excel data into SQLite")
-    parser.add_argument("--data-dir", default="Aker Case Study Data")
-    parser.add_argument("--db", default="db/aker.db")
+    parser = argparse.ArgumentParser(description="Load rent roll / unit availability Excel data into SQLite")
+    parser.add_argument("--data-dir", default="Property Data")
+    parser.add_argument("--db", default="db/portfolio.db")
     args = parser.parse_args()
 
     rent_roll_dir = os.path.join(args.data_dir, "Rent_Roll_with_Lease_Charges")

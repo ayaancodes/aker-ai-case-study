@@ -89,9 +89,9 @@ function renderTicker(sorted) {
    security. A sessionStorage flag remembers the login for this tab session only,
    so coming back to the landing page never re-prompts until the tab closes. ── */
 (function () {
-  const DEMO_EMAIL = "moe@aker-ai.com";
+  const DEMO_EMAIL = "demo@example.com";
   const DEMO_PASSWORD = "demo2026";
-  const AUTH_KEY = "aker_authed";
+  const AUTH_KEY = "terminal_authed";
 
   const modal = document.getElementById("loginModal");
   const errorEl = document.getElementById("gateError");

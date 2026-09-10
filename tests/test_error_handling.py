@@ -8,7 +8,7 @@ and written to the durable loader_errors table so it can't be mistaken for "just
 source file" after the fact.
 
 Uses a scratch data directory with dummy .xlsx files (content doesn't matter -- the
-parser itself is monkeypatched) so this doesn't touch the real source data or db/aker.db.
+parser itself is monkeypatched) so this doesn't touch the real source data or db/portfolio.db.
 """
 
 import os
