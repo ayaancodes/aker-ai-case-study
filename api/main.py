@@ -11,10 +11,12 @@ import sqlite3
 from pathlib import Path
 from typing import Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from api.chat import ChatRequest, stream_chat
 from api.db import DB_PATH, get_connection
@@ -22,6 +24,23 @@ from api.db import DB_PATH, get_connection
 app = FastAPI(title="Portfolio API")
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+
+
+def _client_ip(request: Request) -> str:
+    """Render puts a proxy in front of this service, so request.client.host is always
+    Render's edge, not the visitor -- that would make the "per-IP" limit below apply
+    globally instead. Render is the only hop, so the last entry in X-Forwarded-For (the
+    one Render itself appended) is the real client; anything before it could be spoofed
+    by the caller and isn't trusted."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[-1].strip()
+    return request.client.host if request.client else "unknown"
+
+
+limiter = Limiter(key_func=_client_ip)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 @app.middleware("http")
@@ -718,13 +737,19 @@ TOOL_DISPATCH = {
 
 
 @app.post("/chat")
-def chat(payload: ChatRequest):
+@limiter.limit("10/minute")
+def chat(request: Request, payload: ChatRequest):
     """Streams an SSE response: `text_delta` events carry response text as it's
     generated, `tool_call` events fire before each tool executes (name + a plain-English
     label, for the frontend's "thinking" indicator), `done` closes out a normal turn,
     `error` carries anything that went wrong. Every tool is a direct call into the
     handler functions above -- the chatbot answers through the same code path as the
-    dashboard, never touches SQL on its own."""
+    dashboard, never touches SQL on its own.
+
+    Rate-limited per IP (see _client_ip above) since every call can chain up to
+    MAX_TOOL_ITERATIONS real Anthropic API calls against a personal key, and this
+    endpoint has no auth in front of it -- the sign-in gate is cosmetic, client-side
+    only."""
     return StreamingResponse(
         stream_chat(payload.messages, TOOL_DISPATCH),
         media_type="text/event-stream",

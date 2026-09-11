@@ -5,3 +5,4 @@ openpyxl
 pytest
 anthropic
 python-dotenv
+slowapi
